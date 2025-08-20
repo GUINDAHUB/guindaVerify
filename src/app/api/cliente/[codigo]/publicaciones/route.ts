@@ -8,6 +8,10 @@ export async function GET(
 ) {
   try {
     const { codigo } = await params;
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.get('forceRefresh') === 'true';
+
+    console.log(`📡 API Publicaciones - Cliente: ${codigo}, ForceRefresh: ${forceRefresh}`);
 
     // Obtener información del cliente
     const supabaseService = getSupabaseService();
@@ -27,9 +31,9 @@ export async function GET(
       );
     }
 
-    // Obtener TODAS las tareas de ClickUp (no solo las de estados visibles)
+    // Obtener TODAS las tareas de ClickUp (con opción de refresh forzado)
     const clickUpService = await getClickUpService();
-    const todasLasTareas = await clickUpService.getAllTasksFromList(cliente.clickupListId);
+    const todasLasTareas = await clickUpService.getAllTasksFromList(cliente.clickupListId, forceRefresh);
 
     // Convertir tareas a formato de publicaciones
     const todasLasPublicaciones = todasLasTareas.map(tarea => 

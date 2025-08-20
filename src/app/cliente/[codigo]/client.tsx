@@ -88,7 +88,11 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         setLoading(true);
       }
       
-      const response = await fetch(`/api/cliente/${codigo}/publicaciones`);
+      // Añadir parámetro forceRefresh cuando es un refresh manual
+      const url = `/api/cliente/${codigo}/publicaciones${isRefresh ? '?forceRefresh=true' : ''}`;
+      console.log(`🔄 Fetching publicaciones: ${url}`);
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
         const errorData = await response.json();
@@ -100,7 +104,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
       setData(data);
       
       if (isRefresh) {
-        toast.success('Publicaciones actualizadas');
+        toast.success('✅ Datos actualizados desde ClickUp');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
@@ -204,6 +208,51 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
   const handleRefreshClick = () => {
     handleRefresh();
+  };
+
+  const handleRefreshSingleTask = async (tareaId: string) => {
+    try {
+      setActionLoading(tareaId);
+      console.log(`🔄 Refrescando tarea específica: ${tareaId}`);
+
+      const response = await fetch(`/api/cliente/${codigo}/refresh-task`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tareaId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error refrescando la tarea');
+      }
+
+      const result = await response.json();
+      console.log('✅ Tarea refrescada:', result.publicacion);
+
+      // Actualizar solo esta publicación específica en el estado
+      if (data) {
+        const updateSpecificPublication = (pub: TareaPublicacion) => {
+          if (pub.id === tareaId) {
+            return result.publicacion;
+          }
+          return pub;
+        };
+
+        setData(prev => prev ? {
+          ...prev,
+          publicacionesPorRevisar: prev.publicacionesPorRevisar?.map(updateSpecificPublication) || [],
+          publicacionesPendientesCambios: prev.publicacionesPendientesCambios?.map(updateSpecificPublication) || [],
+          publicacionesAprobadas: prev.publicacionesAprobadas?.map(updateSpecificPublication) || []
+        } : null);
+      }
+
+      toast.success('📝 Datos actualizados desde ClickUp');
+    } catch (error) {
+      console.error('Error refrescando tarea:', error);
+      toast.error(error instanceof Error ? error.message : 'Error refrescando la tarea');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const getTipoPublicacionIcon = (tipo?: string) => {
@@ -637,8 +686,42 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         } : null);
       }
 
-      // Recargar publicaciones para confirmar el cambio desde el servidor
-      setTimeout(() => fetchPublicaciones(true), 1000);
+      // Refrescar la tarea específica para obtener los datos más frescos de ClickUp
+      try {
+        const refreshResponse = await fetch(`/api/cliente/${codigo}/refresh-task`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tareaId: draggedPublication.id }),
+        });
+
+        if (refreshResponse.ok) {
+          const refreshResult = await refreshResponse.json();
+          console.log('🔄 Tarea refrescada desde ClickUp:', refreshResult.publicacion);
+          
+          // Actualizar solo esta publicación específica en el estado
+          if (data) {
+            const updateSpecificPublication = (pub: TareaPublicacion) => {
+              if (pub.id === draggedPublication.id) {
+                return refreshResult.publicacion;
+              }
+              return pub;
+            };
+
+            setData(prev => prev ? {
+              ...prev,
+              publicacionesPorRevisar: prev.publicacionesPorRevisar?.map(updateSpecificPublication) || [],
+              publicacionesPendientesCambios: prev.publicacionesPendientesCambios?.map(updateSpecificPublication) || [],
+              publicacionesAprobadas: prev.publicacionesAprobadas?.map(updateSpecificPublication) || []
+            } : null);
+          }
+        } else {
+          console.warn('No se pudo refrescar la tarea específica, usando refresh completo');
+          setTimeout(() => fetchPublicaciones(true), 1000);
+        }
+      } catch (refreshError) {
+        console.warn('Error refrescando tarea específica, usando refresh completo:', refreshError);
+        setTimeout(() => fetchPublicaciones(true), 1000);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
@@ -872,17 +955,30 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
             </div>
           )}
 
-          {/* Botón de comentarios - siempre visible */}
+          {/* Botones de comentarios y refresh - siempre visibles */}
           <div className="pt-4 border-t border-gray-100">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full mb-3 border-blue-300 text-blue-700 hover:bg-blue-50 shadow-sm"
-              onClick={() => abrirComentarios(publicacion)}
-            >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Ver comentarios
-            </Button>
+            <div className="flex space-x-2 mb-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-50 shadow-sm"
+                onClick={() => abrirComentarios(publicacion)}
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Ver comentarios
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-indigo-300 text-indigo-700 hover:bg-indigo-50 shadow-sm"
+                onClick={() => handleRefreshSingleTask(publicacion.id)}
+                disabled={actionLoading === publicacion.id}
+                title="Actualizar datos desde ClickUp"
+              >
+                <RefreshCw className={`w-4 h-4 ${actionLoading === publicacion.id ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
 
             {/* Acciones - solo para publicaciones que se pueden editar */}
             {canEdit && (

@@ -19,14 +19,17 @@ export class ClickUpService {
   }
 
   // Obtener tareas de una lista específica
-  async getTasksFromList(listId: string, statuses?: string[]): Promise<ClickUpTask[]> {
+  async getTasksFromList(listId: string, statuses?: string[], forceRefresh: boolean = false): Promise<ClickUpTask[]> {
     try {
       console.log(`🔍 Obteniendo tareas de la lista: ${listId}`);
       console.log(`📋 Estados filtrados:`, statuses);
+      console.log(`🔄 Forzar actualización:`, forceRefresh);
       
       const params = new URLSearchParams({
         include_closed: 'false',
         subtasks: 'false',
+        // Añadir timestamp para evitar cache cuando se fuerza refresh
+        ...(forceRefresh && { _t: Date.now().toString() })
       });
 
       if (statuses && statuses.length > 0) {
@@ -39,7 +42,16 @@ export class ClickUpService {
       const url = `${CLICKUP_API_BASE}/list/${listId}/task?${params.toString()}`;
       console.log(`📡 URL de la petición: ${url}`);
 
-      const response = await axios.get(url, { headers: this.getHeaders() });
+      const headers = {
+        ...this.getHeaders(),
+        // Añadir headers para evitar cache cuando se fuerza refresh
+        ...(forceRefresh && { 
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        })
+      };
+
+      const response = await axios.get(url, { headers });
 
       console.log(`✅ Tareas obtenidas: ${response.data.tasks?.length || 0}`);
       return response.data.tasks || [];
@@ -68,19 +80,31 @@ export class ClickUpService {
   }
 
   // Obtener TODAS las tareas de una lista (sin filtrar por estados)
-  async getAllTasksFromList(listId: string): Promise<ClickUpTask[]> {
+  async getAllTasksFromList(listId: string, forceRefresh: boolean = false): Promise<ClickUpTask[]> {
     try {
       console.log(`🔍 Obteniendo TODAS las tareas de la lista: ${listId}`);
+      console.log(`🔄 Forzar actualización:`, forceRefresh);
       
       const params = new URLSearchParams({
         include_closed: 'false',
         subtasks: 'false',
+        // Añadir timestamp para evitar cache cuando se fuerza refresh
+        ...(forceRefresh && { _t: Date.now().toString() })
       });
 
       const url = `${CLICKUP_API_BASE}/list/${listId}/task?${params.toString()}`;
       console.log(`📡 URL de la petición: ${url}`);
 
-      const response = await axios.get(url, { headers: this.getHeaders() });
+      const headers = {
+        ...this.getHeaders(),
+        // Añadir headers para evitar cache cuando se fuerza refresh
+        ...(forceRefresh && { 
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        })
+      };
+
+      const response = await axios.get(url, { headers });
 
       console.log(`✅ Todas las tareas obtenidas: ${response.data.tasks?.length || 0}`);
       return response.data.tasks || [];
@@ -109,13 +133,27 @@ export class ClickUpService {
   }
 
   // Obtener una tarea específica
-  async getTask(taskId: string): Promise<ClickUpTask> {
+  async getTask(taskId: string, forceRefresh: boolean = false): Promise<ClickUpTask> {
     try {
-      const response = await axios.get(
-        `${CLICKUP_API_BASE}/task/${taskId}`,
-        { headers: this.getHeaders() }
-      );
+      const url = new URL(`${CLICKUP_API_BASE}/task/${taskId}`);
+      
+      // Añadir timestamp para evitar cache cuando se fuerza refresh
+      if (forceRefresh) {
+        url.searchParams.set('_t', Date.now().toString());
+      }
 
+      const headers = {
+        ...this.getHeaders(),
+        // Añadir headers para evitar cache cuando se fuerza refresh
+        ...(forceRefresh && { 
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        })
+      };
+
+      const response = await axios.get(url.toString(), { headers });
+
+      console.log(`🔍 Tarea obtenida: ${taskId}${forceRefresh ? ' (forced refresh)' : ''}`);
       return response.data;
     } catch (error) {
       console.error('Error obteniendo tarea de ClickUp:', error);

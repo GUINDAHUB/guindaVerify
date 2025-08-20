@@ -144,10 +144,22 @@ export interface TareaPublicacion {
   urlPublicacion?: string;
 }
 
+export interface UsuarioCliente {
+  id: string;
+  clienteId: string;
+  nombre: string;
+  username: string;
+  esAdminCliente: boolean;
+  activo: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Comentario {
   id: string;
   tareaId: string;
   clienteId: string;
+  usuarioId?: string; // Nuevo campo para trazabilidad
   contenido: string;
   fechaCreacion: Date;
   autor: {
@@ -157,11 +169,27 @@ export interface Comentario {
 }
 
 export interface AccionTarea {
+  id?: string; // Agregar id opcional
   tareaId: string;
   clienteId: string;
+  usuarioId?: string; // Nuevo campo para trazabilidad
   accion: 'aprobar' | 'hay_cambios';
   comentario?: string;
   fechaAccion: Date;
+}
+
+export interface LogActividad {
+  id: string;
+  usuarioId?: string;
+  clienteId: string;
+  accion: string;
+  detalles?: string;
+  tareaId?: string;
+  comentarioId?: string;
+  accionTareaId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  fecha: Date;
 }
 
 export interface ConfiguracionSistema {

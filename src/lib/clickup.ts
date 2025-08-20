@@ -137,6 +137,63 @@ export class ClickUpService {
     }
   }
 
+  // Actualizar la fecha de publicación (campo personalizado)
+  async updateTaskDueDate(taskId: string, dueDate: number): Promise<void> {
+    try {
+      // Primero, obtener la tarea para encontrar el campo personalizado de fecha
+      const task = await this.getTask(taskId);
+      
+      // Buscar el campo de fecha de publicación
+      const campoFecha = task.custom_fields.find(field => 
+        field.name.toLowerCase().includes('fecha') && 
+        (field.name.toLowerCase().includes('publicacion') || 
+         field.name.toLowerCase().includes('publicación'))
+      );
+
+      if (!campoFecha) {
+        console.error('❌ No se encontró campo de fecha de publicación:', {
+          taskId,
+          availableFields: task.custom_fields.map(f => ({ name: f.name, type: f.type, id: f.id }))
+        });
+        throw new Error('No se encontró el campo personalizado de fecha de publicación');
+      }
+
+      console.log('🔍 Campo de fecha encontrado:', {
+        fieldId: campoFecha.id,
+        fieldName: campoFecha.name,
+        fieldType: campoFecha.type,
+        currentValue: campoFecha.value
+      });
+
+      // Actualizar el campo personalizado usando la API específica
+      const response = await axios.post(
+        `${CLICKUP_API_BASE}/task/${taskId}/field/${campoFecha.id}`,
+        { value: dueDate },
+        { headers: this.getHeaders() }
+      );
+
+      console.log('✅ ClickUp API - Campo personalizado actualizado:', {
+        status: response.status,
+        data: response.data,
+        fieldId: campoFecha.id,
+        fieldName: campoFecha.name,
+        newValue: dueDate,
+        fechaComprensible: new Date(dueDate).toISOString()
+      });
+
+    } catch (error: any) {
+      console.error('❌ ClickUp API - Error actualizando campo personalizado:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        taskId,
+        dueDate
+      });
+      throw new Error(`No se pudo actualizar la fecha de publicación: ${error.message}`);
+    }
+  }
+
   // Agregar comentario a una tarea
   async addComment(taskId: string, comment: string): Promise<void> {
     try {
@@ -543,14 +600,26 @@ export class ClickUpService {
           // ClickUp timestamps están en milisegundos
           const date = new Date(timestamp);
           if (!isNaN(date.getTime())) {
-            return date.toISOString();
+            // Crear fecha en zona horaria local para evitar offset
+            const year = date.getUTCFullYear();
+            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(date.getUTCDate()).padStart(2, '0');
+            const fechaLocal = `${year}-${month}-${day}`;
+            
+            return fechaLocal;
           }
         }
         
         // Intentar parsear como fecha normal
         const date = new Date(fechaRaw);
         if (!isNaN(date.getTime())) {
-          return date.toISOString();
+          // Crear fecha en zona horaria local para evitar offset
+          const year = date.getUTCFullYear();
+          const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+          const day = String(date.getUTCDate()).padStart(2, '0');
+          const fechaLocal = `${year}-${month}-${day}`;
+          
+          return fechaLocal;
         }
       } catch (error) {
         console.warn('Error parseando fecha programada:', fechaRaw, error);

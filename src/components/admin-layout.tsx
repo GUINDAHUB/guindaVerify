@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Home, Users, Settings, ArrowLeft, LogOut, Key } from "lucide-react";
+import { Home, Users, Settings, ArrowLeft, LogOut, Key, FileText } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
@@ -37,6 +37,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       href: '/admin',
       icon: Users,
       current: pathname === '/admin'
+    },
+    {
+      name: 'Logs de Actividad',
+      href: '/admin/logs',
+      icon: FileText,
+      current: pathname === '/admin/logs'
     },
     {
       name: 'Configuración',

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash2, Users, Settings, Eye, RefreshCw, Key } from "lucide-react";
+import { Plus, Edit, Trash2, Users, Settings, Eye, RefreshCw, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { Cliente } from '@/types';
 import AdminLayout from '@/components/admin-layout';
@@ -37,9 +37,19 @@ export function AdminPageClient() {
   const [selectedEstadosVisibles, setSelectedEstadosVisibles] = useState<string[]>([]);
   const [selectedEstadosAprobacion, setSelectedEstadosAprobacion] = useState<string[]>([]);
   const [selectedEstadosRechazo, setSelectedEstadosRechazo] = useState<string[]>([]);
-  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [selectedClienteForPassword, setSelectedClienteForPassword] = useState<Cliente | null>(null);
-  const [clientPassword, setClientPassword] = useState('');
+
+  
+  // Estados para gestión de usuarios
+  const [usersDialogOpen, setUsersDialogOpen] = useState(false);
+  const [selectedClienteForUsers, setSelectedClienteForUsers] = useState<Cliente | null>(null);
+  const [clientUsers, setClientUsers] = useState<any[]>([]);
+  const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
+  const [newUserData, setNewUserData] = useState({
+    nombre: '',
+    password: ''
+  });
+  const [passwordCheckStatus, setPasswordCheckStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadClientes();
@@ -311,35 +321,124 @@ export function AdminPageClient() {
     }
   };
 
-  const handleSetClientPassword = async () => {
-    if (!selectedClienteForPassword || !clientPassword) return;
 
-    if (clientPassword.length < 6) {
+
+  // Funciones para gestión de usuarios
+  const loadClientUsers = async (clienteId: string) => {
+    try {
+      const response = await fetch(`/api/admin/clientes/${clienteId}/usuarios`);
+      if (response.ok) {
+        const data = await response.json();
+        setClientUsers(data.usuarios);
+      } else {
+        toast.error('Error al cargar usuarios');
+      }
+    } catch (error) {
+      toast.error('Error de conexión');
+    }
+  };
+
+  const handleManageUsers = (cliente: Cliente) => {
+    setSelectedClienteForUsers(cliente);
+    setUsersDialogOpen(true);
+    loadClientUsers(cliente.id);
+  };
+
+  const handleCreateUser = async () => {
+    if (!selectedClienteForUsers || !newUserData.nombre || !newUserData.password) {
+      toast.error('Nombre y contraseña son requeridos');
+      return;
+    }
+
+    if (newUserData.password.length < 6) {
       toast.error('La contraseña debe tener al menos 6 caracteres');
       return;
     }
 
+    // Verificar si la contraseña ya existe (esto requeriría llamar al backend para verificar)
+    // Por ahora, solo mostramos una advertencia en la UI si hay usuarios múltiples
+
     try {
-      const response = await fetch(`/api/admin/clientes/${selectedClienteForPassword.id}/password`, {
+      const requestData = {
+        nombre: newUserData.nombre,
+        password: newUserData.password,
+        esAdminCliente: false
+      };
+
+      const response = await fetch(`/api/admin/clientes/${selectedClienteForUsers.id}/usuarios`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          codigo: selectedClienteForPassword.codigo,
-          password: clientPassword
-        })
+        body: JSON.stringify(requestData),
       });
-
+      
       if (response.ok) {
-        toast.success('Contraseña establecida correctamente');
-        setPasswordDialogOpen(false);
-        setSelectedClienteForPassword(null);
-        setClientPassword('');
+        const data = await response.json();
+        toast.success('Usuario creado correctamente');
+        setNewUserDialogOpen(false);
+        setNewUserData({ nombre: '', password: '' });
+        loadClientUsers(selectedClienteForUsers.id);
       } else {
-        const error = await response.json();
-        toast.error(error.error || 'Error al establecer la contraseña');
+        const responseText = await response.text();
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch (e) {
+          errorData = { error: 'Error de servidor desconocido' };
+        }
+        
+        toast.error(errorData.error || 'Error al crear usuario');
       }
     } catch (error) {
       toast.error('Error de conexión');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`¿Estás seguro de que quieres eliminar al usuario "${userName}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/clientes/${selectedClienteForUsers?.id}/usuarios?userId=${userId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        toast.success('Usuario eliminado correctamente');
+        loadClientUsers(selectedClienteForUsers!.id);
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Error al eliminar usuario');
+      }
+    } catch (error) {
+      toast.error('Error de conexión');
+    }
+  };
+
+  const checkPasswordAvailability = async (password: string) => {
+    if (!password || password.length < 6 || !selectedClienteForUsers) {
+      setPasswordCheckStatus('idle');
+      return;
+    }
+
+    setPasswordCheckStatus('checking');
+
+    try {
+      const response = await fetch(`/api/admin/clientes/${selectedClienteForUsers.id}/check-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setPasswordCheckStatus(data.exists ? 'taken' : 'available');
+      } else {
+        setPasswordCheckStatus('idle');
+      }
+    } catch (error) {
+      setPasswordCheckStatus('idle');
     }
   };
 
@@ -689,13 +788,11 @@ export function AdminPageClient() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              setSelectedClienteForPassword(cliente);
-                              setPasswordDialogOpen(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-800"
+                            onClick={() => handleManageUsers(cliente)}
+                            className="text-green-600 hover:text-green-800"
+                            title="Gestionar usuarios"
                           >
-                            <Key className="h-4 w-4" />
+                            <Users className="h-4 w-4" />
                           </Button>
                           <Button
                             size="sm"
@@ -716,37 +813,175 @@ export function AdminPageClient() {
         </CardContent>
       </Card>
 
-      {/* Diálogo para configurar contraseña del cliente */}
-      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
-        <DialogContent>
+
+
+      {/* Diálogo para gestionar usuarios del cliente */}
+      <Dialog open={usersDialogOpen} onOpenChange={setUsersDialogOpen}>
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Configurar Contraseña del Cliente</DialogTitle>
+            <DialogTitle>Gestionar Usuarios - {selectedClienteForUsers?.nombre}</DialogTitle>
             <DialogDescription>
-              Establece una nueva contraseña para el portal de {selectedClienteForPassword?.nombre}
+              Administra los usuarios que pueden acceder al portal de este cliente
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Label htmlFor="clientPassword">Nueva contraseña</Label>
-            <Input
-              id="clientPassword"
-              type="password"
-              value={clientPassword}
-              onChange={(e) => setClientPassword(e.target.value)}
-              placeholder="Mínimo 6 caracteres"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              El cliente usará esta contraseña para acceder a su portal: /cliente/{selectedClienteForPassword?.codigo}
-            </p>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Usuarios del Cliente</h3>
+              <Button onClick={() => {
+                setNewUserDialogOpen(true);
+                setPasswordCheckStatus('idle');
+                setNewUserData({ nombre: '', password: '' });
+                if (debounceTimer) {
+                  clearTimeout(debounceTimer);
+                  setDebounceTimer(null);
+                }
+              }}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Nuevo Usuario
+              </Button>
+            </div>
+            
+            {clientUsers.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 px-3">Nombre</th>
+                      <th className="text-left py-2 px-3">Usuario</th>
+                      <th className="text-left py-2 px-3">Estado</th>
+                      <th className="text-left py-2 px-3">Creado</th>
+                      <th className="text-left py-2 px-3">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientUsers.map((user) => (
+                      <tr key={user.id} className="border-b">
+                        <td className="py-2 px-3">{user.nombre}</td>
+                        <td className="py-2 px-3">{user.username}</td>
+                        <td className="py-2 px-3">
+                          <Badge variant={user.activo ? "default" : "destructive"}>
+                            {user.activo ? "Activo" : "Inactivo"}
+                          </Badge>
+                        </td>
+                        <td className="py-2 px-3 text-sm text-gray-500">
+                          {new Date(user.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="py-2 px-3">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteUser(user.id, user.nombre)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No hay usuarios creados para este cliente
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setUsersDialogOpen(false)}>
+              Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para crear nuevo usuario */}
+      <Dialog open={newUserDialogOpen} onOpenChange={setNewUserDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+            <DialogDescription>
+              Crea un nuevo usuario para el cliente {selectedClienteForUsers?.nombre}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div>
+              <Label htmlFor="newUserNombre">Nombre</Label>
+              <Input
+                id="newUserNombre"
+                value={newUserData.nombre}
+                onChange={(e) => setNewUserData({...newUserData, nombre: e.target.value})}
+                placeholder="Ej: Juan Pérez"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                El nombre de usuario se generará automáticamente
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="newUserPassword">Contraseña</Label>
+              <Input
+                id="newUserPassword"
+                type="password"
+                value={newUserData.password}
+                onChange={(e) => {
+                  const newPassword = e.target.value;
+                  setNewUserData({...newUserData, password: newPassword});
+                  
+                  // Limpiar timeout anterior
+                  if (debounceTimer) {
+                    clearTimeout(debounceTimer);
+                  }
+                  
+                  // Nuevo timeout para verificar contraseña
+                  const timer = setTimeout(() => {
+                    checkPasswordAvailability(newPassword);
+                  }, 500);
+                  
+                  setDebounceTimer(timer);
+                }}
+                placeholder="Mínimo 6 caracteres"
+                className={
+                  passwordCheckStatus === 'taken' ? 'border-red-500' :
+                  passwordCheckStatus === 'available' ? 'border-green-500' : ''
+                }
+              />
+              {passwordCheckStatus === 'checking' && (
+                <p className="text-xs text-blue-600 mt-1">
+                  🔍 Verificando disponibilidad...
+                </p>
+              )}
+              {passwordCheckStatus === 'taken' && (
+                <p className="text-xs text-red-600 mt-1">
+                  ❌ Esta contraseña ya está en uso. Elige otra diferente.
+                </p>
+              )}
+              {passwordCheckStatus === 'available' && (
+                <p className="text-xs text-green-600 mt-1">
+                  ✅ Contraseña disponible
+                </p>
+              )}
+              {passwordCheckStatus === 'idle' && newUserData.password.length > 0 && newUserData.password.length < 6 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Mínimo 6 caracteres requeridos
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setPasswordDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setNewUserDialogOpen(false)}>
               Cancelar
             </Button>
             <Button 
-              onClick={handleSetClientPassword}
-              disabled={!clientPassword || clientPassword.length < 6}
+              onClick={handleCreateUser}
+              disabled={
+                !newUserData.nombre || 
+                !newUserData.password || 
+                newUserData.password.length < 6 ||
+                passwordCheckStatus === 'taken' ||
+                passwordCheckStatus === 'checking'
+              }
             >
-              Establecer Contraseña
+              Crear Usuario
             </Button>
           </div>
         </DialogContent>

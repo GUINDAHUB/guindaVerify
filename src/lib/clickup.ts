@@ -613,30 +613,101 @@ export class ClickUpService {
   }
 
   private extractFechaProgramada(task: ClickUpTask): string | undefined {
-    // Buscar en campos personalizados de fecha
-    const campoFecha = task.custom_fields.find(field => 
+    console.log(`\n🔍 === DEBUGGING FECHA PROGRAMADA - Tarea: ${task.name} (${task.id}) ===`);
+    
+    // Log de TODOS los campos personalizados para debugging
+    console.log(`📋 Todos los campos personalizados (${task.custom_fields.length}):`, 
+      task.custom_fields.map(f => ({
+        id: f.id,
+        name: f.name,
+        type: f.type,
+        value: f.value,
+        type_config: f.type_config
+      }))
+    );
+
+    // Log de fechas de tarea estándar
+    console.log(`📅 Fechas estándar de tarea:`, {
+      due_date: task.due_date,
+      start_date: task.start_date,
+      date_created: task.date_created,
+      date_updated: task.date_updated
+    });
+
+    // Estrategia 1: Buscar campos tipo 'date'
+    const camposFechaTipo = task.custom_fields.filter(field => field.type === 'date');
+    console.log(`🎯 Campos tipo 'date' encontrados (${camposFechaTipo.length}):`, 
+      camposFechaTipo.map(f => ({ name: f.name, value: f.value, type_config: f.type_config }))
+    );
+
+    // Estrategia 2: Buscar por nombre relacionado con fecha
+    const camposFechaNombre = task.custom_fields.filter(field => 
       field.name.toLowerCase().includes('fecha') || 
       field.name.toLowerCase().includes('programada') ||
       field.name.toLowerCase().includes('publicación') ||
-      field.name.toLowerCase().includes('publicacion')
+      field.name.toLowerCase().includes('publicacion') ||
+      field.name.toLowerCase().includes('schedule') ||
+      field.name.toLowerCase().includes('publish') ||
+      field.name.toLowerCase().includes('date')
     );
+    console.log(`📝 Campos por nombre relacionado (${camposFechaNombre.length}):`, 
+      camposFechaNombre.map(f => ({ name: f.name, value: f.value, type: f.type }))
+    );
+
+    // Priorizar: 1) campos tipo date con nombre relacionado, 2) cualquier campo tipo date, 3) por nombre
+    let campoFecha = camposFechaTipo.find(field => 
+      field.name.toLowerCase().includes('fecha') || 
+      field.name.toLowerCase().includes('programada') ||
+      field.name.toLowerCase().includes('publicación') ||
+      field.name.toLowerCase().includes('publicacion') ||
+      field.name.toLowerCase().includes('schedule') ||
+      field.name.toLowerCase().includes('publish') ||
+      field.name.toLowerCase().includes('date')
+    );
+
+    if (!campoFecha && camposFechaTipo.length > 0) {
+      campoFecha = camposFechaTipo[0];
+      console.log(`🔄 Usando primer campo tipo 'date' disponible:`, campoFecha.name);
+    }
+
+    if (!campoFecha && camposFechaNombre.length > 0) {
+      campoFecha = camposFechaNombre[0];
+      console.log(`🔄 Usando primer campo por nombre relacionado:`, campoFecha.name);
+    }
     
     let fechaRaw: string | undefined;
+    let fuente = '';
     
-    if (campoFecha && campoFecha.value) {
+    if (campoFecha && campoFecha.value !== null && campoFecha.value !== undefined) {
       fechaRaw = campoFecha.value.toString();
+      fuente = `campo personalizado '${campoFecha.name}' (tipo: ${campoFecha.type})`;
+      console.log(`✅ Fecha encontrada en ${fuente}:`, { raw: fechaRaw, originalValue: campoFecha.value });
     } else if (task.due_date) {
       fechaRaw = task.due_date;
+      fuente = 'due_date de la tarea';
+      console.log(`✅ Fecha encontrada en ${fuente}:`, fechaRaw);
+    } else {
+      console.log(`❌ No se encontró fecha en ninguna fuente para tarea: ${task.name}`);
+      console.log(`🔍 Campos disponibles:`, task.custom_fields.map(f => f.name));
+      return undefined;
     }
 
     // Validar y convertir la fecha a formato ISO
     if (fechaRaw) {
       try {
-        // Si es un timestamp de ClickUp (milisegundos), convertir
+        console.log(`🔄 Procesando fecha raw: "${fechaRaw}" (tipo: ${typeof fechaRaw}) desde ${fuente}`);
+        
+        // Si es un timestamp de ClickUp (solo números), convertir
         if (/^\d+$/.test(fechaRaw)) {
           const timestamp = parseInt(fechaRaw);
-          // ClickUp timestamps están en milisegundos
-          const date = new Date(timestamp);
+          console.log(`⏰ Detectado timestamp numérico: ${timestamp}`);
+          
+          // ClickUp timestamps pueden estar en milisegundos o segundos
+          // Si es menor que 10^12, probablemente sea en segundos
+          const timestampMs = timestamp < 1e12 ? timestamp * 1000 : timestamp;
+          console.log(`⏰ Timestamp ajustado a ms: ${timestampMs}`);
+          
+          const date = new Date(timestampMs);
           if (!isNaN(date.getTime())) {
             // Crear fecha en zona horaria local para evitar offset
             const year = date.getUTCFullYear();
@@ -644,7 +715,10 @@ export class ClickUpService {
             const day = String(date.getUTCDate()).padStart(2, '0');
             const fechaLocal = `${year}-${month}-${day}`;
             
+            console.log(`✅ Fecha convertida desde timestamp: ${fechaLocal} (UTC: ${date.toISOString()})`);
             return fechaLocal;
+          } else {
+            console.error(`❌ Timestamp inválido: ${timestamp} -> ${date}`);
           }
         }
         
@@ -657,13 +731,17 @@ export class ClickUpService {
           const day = String(date.getUTCDate()).padStart(2, '0');
           const fechaLocal = `${year}-${month}-${day}`;
           
+          console.log(`✅ Fecha convertida desde string: ${fechaLocal} (UTC: ${date.toISOString()}, original: ${fechaRaw})`);
           return fechaLocal;
+        } else {
+          console.error(`❌ Fecha inválida al parsear: "${fechaRaw}" -> ${date}`);
         }
       } catch (error) {
-        console.warn('Error parseando fecha programada:', fechaRaw, error);
+        console.error('❌ Error parseando fecha programada:', { fechaRaw, fuente, error });
       }
     }
 
+    console.log(`❌ No se pudo extraer fecha válida de la tarea: ${task.name}`);
     return undefined;
   }
 

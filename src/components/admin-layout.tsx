@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Home, Users, Settings, ArrowLeft, LogOut, Key, FileText } from "lucide-react";
+import { Home, Users, Settings, ArrowLeft, LogOut, Key, FileText, Bug } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
@@ -49,6 +49,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       href: '/admin/configuracion',
       icon: Settings,
       current: pathname === '/admin/configuracion'
+    },
+    {
+      name: 'Debug ClickUp',
+      href: '/admin/debug-clickup',
+      icon: Bug,
+      current: pathname === '/admin/debug-clickup'
     }
   ];
 

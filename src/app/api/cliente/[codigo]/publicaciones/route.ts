@@ -36,17 +36,38 @@ export async function GET(
       clickUpService.convertToTareaPublicacion(tarea)
     );
 
-    // Categorizar publicaciones por estado
-    const publicacionesPorRevisar = (todasLasPublicaciones || []).filter(pub => 
-      pub && cliente.estadosVisibles && cliente.estadosVisibles.includes(pub.estado)
+    // Función para ordenar publicaciones por fecha programada (más próximas primero)
+    const ordenarPorFecha = (publicaciones: any[]) => {
+      return publicaciones.sort((a, b) => {
+        // Si no tienen fecha programada, van al final
+        if (!a.fechaProgramada && !b.fechaProgramada) return 0;
+        if (!a.fechaProgramada) return 1;
+        if (!b.fechaProgramada) return -1;
+        
+        // Ordenar por fecha programada (más próxima primero - orden ascendente)
+        const fechaA = new Date(a.fechaProgramada);
+        const fechaB = new Date(b.fechaProgramada);
+        return fechaA.getTime() - fechaB.getTime();
+      });
+    };
+
+    // Categorizar y ordenar publicaciones por estado
+    const publicacionesPorRevisar = ordenarPorFecha(
+      (todasLasPublicaciones || []).filter(pub => 
+        pub && cliente.estadosVisibles && cliente.estadosVisibles.includes(pub.estado)
+      )
     );
 
-    const publicacionesPendientesCambios = (todasLasPublicaciones || []).filter(pub => 
-      pub && cliente.estadosRechazo && cliente.estadosRechazo.includes(pub.estado)
+    const publicacionesPendientesCambios = ordenarPorFecha(
+      (todasLasPublicaciones || []).filter(pub => 
+        pub && cliente.estadosRechazo && cliente.estadosRechazo.includes(pub.estado)
+      )
     );
 
-    const publicacionesAprobadas = (todasLasPublicaciones || []).filter(pub => 
-      pub && cliente.estadosAprobacion && cliente.estadosAprobacion.includes(pub.estado)
+    const publicacionesAprobadas = ordenarPorFecha(
+      (todasLasPublicaciones || []).filter(pub => 
+        pub && cliente.estadosAprobacion && cliente.estadosAprobacion.includes(pub.estado)
+      )
     );
 
     console.log('📊 Estadísticas de categorización:');

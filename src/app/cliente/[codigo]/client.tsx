@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { CheckCircle, MessageCircle, User, RefreshCw, ExternalLink, FileText, Camera, Clock, Hash, Filter, X, LogOut, MessageSquare } from 'lucide-react';
+import { CheckCircle, MessageCircle, User, RefreshCw, ExternalLink, FileText, Camera, Clock, Hash, Filter, X, LogOut, MessageSquare, Calendar, List, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ComentariosModal } from '@/components/comentarios-modal';
 
 interface ClienteData {
@@ -39,7 +39,10 @@ interface Filtros {
   fechaDesde: string;
   fechaHasta: string;
   busqueda: string;
+  mes: string; // Nuevo filtro para mes
 }
+
+type VistaActiva = 'lista' | 'calendario';
 
 interface ClientePortalClientProps {
   codigo: string;
@@ -48,6 +51,7 @@ interface ClientePortalClientProps {
 export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
   const [data, setData] = useState<PublicacionesResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [comentario, setComentario] = useState('');
@@ -58,7 +62,8 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     plataforma: '',
     fechaDesde: '',
     fechaHasta: '',
-    busqueda: ''
+    busqueda: '',
+    mes: ''
   });
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [comentariosModal, setComentariosModal] = useState<{
@@ -70,6 +75,10 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     tareaId: '',
     tareaNombre: '',
   });
+  const [vistaActiva, setVistaActiva] = useState<VistaActiva>('lista');
+  const [fechaCalendario, setFechaCalendario] = useState(new Date());
+  const [draggedPublication, setDraggedPublication] = useState<TareaPublicacion | null>(null);
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null);
 
   const fetchPublicaciones = useCallback(async (isRefresh = false) => {
     try {
@@ -106,13 +115,32 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         setLoading(false);
       }
     }
-  }, [codigo]); // Dependencias del useCallback
+  }, [codigo]);
+
+  const fetchCurrentUser = useCallback(async () => {
+    try {
+      // Crear un endpoint simple para obtener el usuario actual
+      const response = await fetch('/api/cliente/auth/me', {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        setCurrentUser(userData.user);
+      }
+    } catch (error) {
+      console.error('Error cargando usuario:', error);
+      // Si no podemos obtener el usuario, no es crítico
+    }
+  }, []); // Dependencias del useCallback
 
   useEffect(() => {
     if (codigo) {
       fetchPublicaciones();
+      fetchCurrentUser();
     }
-  }, [codigo, fetchPublicaciones]);
+  }, [codigo, fetchPublicaciones, fetchCurrentUser]);
 
   const handleLogout = async () => {
     try {
@@ -273,6 +301,22 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         }
       }
 
+      // Filtro por mes específico
+      if (filtros.mes && pub.fechaProgramada) {
+        try {
+          const fechaPublicacion = new Date(pub.fechaProgramada);
+          const year = fechaPublicacion.getFullYear();
+          const month = fechaPublicacion.getMonth();
+          const monthKey = `${year}-${month.toString().padStart(2, '0')}`;
+          
+          if (monthKey !== filtros.mes) {
+            return false;
+          }
+        } catch {
+          // Si hay error parseando la fecha, ignorar este filtro
+        }
+      }
+
       // Filtro por fecha
       if (filtros.fechaDesde && pub.fechaProgramada) {
         try {
@@ -332,6 +376,58 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     return plataformas;
   };
 
+  // Función para obtener meses disponibles con publicaciones
+  const getMesesDisponibles = (): Array<{value: string, label: string, count: number}> => {
+    if (!data) return [];
+    
+    const todasPublicaciones = [
+      ...(data.publicacionesPorRevisar || []),
+      ...(data.publicacionesPendientesCambios || []),
+      ...(data.publicacionesAprobadas || [])
+    ];
+    
+    // Agrupar por mes
+    const mesesMap = new Map<string, {label: string, count: number}>();
+    
+    todasPublicaciones.forEach(pub => {
+      if (pub.fechaProgramada) {
+        try {
+          const fecha = new Date(pub.fechaProgramada);
+          if (!isNaN(fecha.getTime())) {
+            const year = fecha.getFullYear();
+            const month = fecha.getMonth();
+            const monthKey = `${year}-${month.toString().padStart(2, '0')}`;
+            
+            const monthLabel = fecha.toLocaleDateString('es-ES', { 
+              month: 'long', 
+              year: 'numeric' 
+            });
+            
+            if (mesesMap.has(monthKey)) {
+              mesesMap.get(monthKey)!.count++;
+            } else {
+              mesesMap.set(monthKey, {
+                label: monthLabel,
+                count: 1
+              });
+            }
+          }
+        } catch (error) {
+          console.warn('Error procesando fecha:', pub.fechaProgramada, error);
+        }
+      }
+    });
+    
+    // Convertir a array y ordenar por fecha (más recientes primero)
+    return Array.from(mesesMap.entries())
+      .map(([value, data]) => ({
+        value,
+        label: `${data.label} (${data.count})`,
+        count: data.count
+      }))
+      .sort((a, b) => b.value.localeCompare(a.value));
+  };
+
   // Función para limpiar filtros
   const limpiarFiltros = () => {
     setFiltros({
@@ -339,7 +435,8 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
       plataforma: '',
       fechaDesde: '',
       fechaHasta: '',
-      busqueda: ''
+      busqueda: '',
+      mes: ''
     });
   };
 
@@ -361,8 +458,269 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
   // Verificar si hay filtros activos
   const hayFiltrosActivos = () => {
-    return filtros.tipoPublicacion || filtros.plataforma || filtros.fechaDesde || filtros.fechaHasta || filtros.busqueda;
+    return filtros.tipoPublicacion || filtros.plataforma || filtros.fechaDesde || filtros.fechaHasta || filtros.busqueda || filtros.mes;
   };
+
+  // Funciones para el calendario
+  const obtenerTodasPublicaciones = (): TareaPublicacion[] => {
+    if (!data) return [];
+    const todasPublicaciones = [
+      ...(data.publicacionesPorRevisar || []),
+      ...(data.publicacionesPendientesCambios || []),
+      ...(data.publicacionesAprobadas || [])
+    ];
+    // Aplicar filtros también en el calendario
+    return aplicarFiltros(todasPublicaciones);
+  };
+
+  const obtenerPublicacionesPorFecha = (fecha: Date): TareaPublicacion[] => {
+    const todasPublicaciones = obtenerTodasPublicaciones();
+    const fechaStr = fecha.toISOString().split('T')[0];
+    
+    const resultado = todasPublicaciones.filter(pub => {
+      if (!pub.fechaProgramada) return false;
+      try {
+        // Si la fecha ya está en formato YYYY-MM-DD, usarla directamente
+        let fechaPub = pub.fechaProgramada;
+        if (fechaPub.includes('T') || fechaPub.length > 10) {
+          fechaPub = new Date(pub.fechaProgramada).toISOString().split('T')[0];
+        }
+        
+        return fechaPub === fechaStr;
+      } catch {
+        return false;
+      }
+    });
+    
+    return resultado;
+  };
+
+  const obtenerDiasDelMes = (fecha: Date) => {
+    const año = fecha.getFullYear();
+    const mes = fecha.getMonth();
+    
+    // Primer día del mes - FORZAR horario a mediodia para evitar offset
+    const primerDia = new Date(año, mes, 1, 12, 0, 0);
+    // Último día del mes
+    const ultimoDia = new Date(año, mes + 1, 0, 12, 0, 0);
+    
+    // Día de la semana del primer día (0 = domingo, 1 = lunes, etc.)
+    let inicioDiaSemana = primerDia.getDay();
+    // Convertir para que lunes sea 0
+    inicioDiaSemana = inicioDiaSemana === 0 ? 6 : inicioDiaSemana - 1;
+    
+    const dias = [];
+    
+    // Agregar días del mes anterior para completar la primera semana
+    for (let i = inicioDiaSemana - 1; i >= 0; i--) {
+      const fecha = new Date(año, mes, -i, 12, 0, 0);
+      dias.push({ fecha, esDelMesActual: false });
+    }
+    
+    // Agregar todos los días del mes actual
+    for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
+      const fecha = new Date(año, mes, dia, 12, 0, 0);
+      dias.push({ fecha, esDelMesActual: true });
+    }
+    
+    // Agregar días del siguiente mes para completar la última semana
+    const diasCompletos = dias.length;
+    const diasParaCompletar = 42 - diasCompletos; // 6 semanas * 7 días
+    for (let dia = 1; dia <= diasParaCompletar; dia++) {
+      const fecha = new Date(año, mes + 1, dia, 12, 0, 0);
+      dias.push({ fecha, esDelMesActual: false });
+    }
+    
+    return dias;
+  };
+
+  const navegarMes = (direccion: 'anterior' | 'siguiente') => {
+    setFechaCalendario(prev => {
+      const nuevaFecha = new Date(prev);
+      if (direccion === 'anterior') {
+        nuevaFecha.setMonth(nuevaFecha.getMonth() - 1);
+      } else {
+        nuevaFecha.setMonth(nuevaFecha.getMonth() + 1);
+      }
+      return nuevaFecha;
+    });
+  };
+
+  // Funciones para drag & drop
+  const handleDragStart = (e: React.DragEvent, publicacion: TareaPublicacion) => {
+    setDraggedPublication(publicacion);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', publicacion.id);
+    
+    // Agregar clase visual al elemento arrastrado
+    e.currentTarget.classList.add('opacity-50');
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDraggedPublication(null);
+    setDragOverDay(null);
+    e.currentTarget.classList.remove('opacity-50');
+  };
+
+  const handleDragOver = (e: React.DragEvent, fecha: Date) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const fechaStr = fecha.toISOString().split('T')[0];
+    setDragOverDay(fechaStr);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Solo limpiar si realmente salimos del contenedor
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setDragOverDay(null);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, fecha: Date) => {
+    e.preventDefault();
+    setDragOverDay(null);
+    
+    if (!draggedPublication) return;
+    
+    const nuevaFecha = fecha.toISOString().split('T')[0];
+    const fechaActual = draggedPublication.fechaProgramada ? 
+      (draggedPublication.fechaProgramada.includes('T') || draggedPublication.fechaProgramada.length > 10 
+        ? new Date(draggedPublication.fechaProgramada).toISOString().split('T')[0] 
+        : draggedPublication.fechaProgramada) : null;
+    
+    // Si es la misma fecha, no hacer nada
+    if (fechaActual === nuevaFecha) {
+      setDraggedPublication(null);
+      return;
+    }
+
+    try {
+      // Mostrar loading
+      setActionLoading(draggedPublication.id);
+      
+      const response = await fetch(`/api/cliente/${codigo}/actualizar-fecha`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tareaId: draggedPublication.id,
+          nuevaFecha: nuevaFecha
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error actualizando fecha');
+      }
+
+      const result = await response.json();
+      console.log('✅ Fecha actualizada:', result);
+      toast.success(`Publicación movida a ${fecha.toLocaleDateString('es-ES')}`);
+
+      // Actualizar inmediatamente en el estado local para mayor responsividad
+      if (data) {
+        const updatePublication = (pub: TareaPublicacion) => {
+          if (pub.id === draggedPublication.id) {
+            return { ...pub, fechaProgramada: nuevaFecha };
+          }
+          return pub;
+        };
+
+        setData(prev => prev ? {
+          ...prev,
+          publicacionesPorRevisar: prev.publicacionesPorRevisar?.map(updatePublication) || [],
+          publicacionesPendientesCambios: prev.publicacionesPendientesCambios?.map(updatePublication) || [],
+          publicacionesAprobadas: prev.publicacionesAprobadas?.map(updatePublication) || []
+        } : null);
+      }
+
+      // Recargar publicaciones para confirmar el cambio desde el servidor
+      setTimeout(() => fetchPublicaciones(true), 1000);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error desconocido');
+    } finally {
+      setActionLoading(null);
+      setDraggedPublication(null);
+    }
+  };
+
+  // Función para renderizar tarjeta resumida para calendario
+  function renderPublicacionCardResumida(publicacion: TareaPublicacion) {
+    const canEdit = data?.publicacionesPorRevisar?.some(p => p.id === publicacion.id) || false;
+    
+    return (
+      <div 
+        key={publicacion.id}
+        draggable={true}
+        onDragStart={(e) => handleDragStart(e, publicacion)}
+        onDragEnd={handleDragEnd}
+        className={`p-2 rounded-lg text-xs cursor-move transition-all duration-200 hover:shadow-md group ${
+          canEdit 
+            ? 'bg-yellow-100 border-yellow-300 hover:bg-yellow-200' 
+            : publicacion.estado?.toLowerCase().includes('aprobado')
+              ? 'bg-green-100 border-green-300 hover:bg-green-200'
+              : 'bg-orange-100 border-orange-300 hover:bg-orange-200'
+        } border active:cursor-grabbing`}
+        onClick={() => abrirComentarios(publicacion)}
+        title="Arrastra para cambiar fecha"
+      >
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center space-x-1">
+            <span className="text-sm">
+              {getTipoPublicacionIcon(publicacion.tipoPublicacion)}
+            </span>
+            <div className="flex space-x-0.5">
+              {getPlataformasIcons(publicacion.plataformaPublicacion).slice(0, 2).map((icon, index) => (
+                <span key={index} className="text-xs">
+                  {icon}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className={`w-2 h-2 rounded-full ${
+            canEdit 
+              ? 'bg-yellow-500' 
+              : publicacion.estado?.toLowerCase().includes('aprobado')
+                ? 'bg-green-500'
+                : 'bg-orange-500'
+          }`} />
+        </div>
+        
+        <div className="font-medium text-gray-900 line-clamp-2 text-xs mb-1 group-hover:text-gray-700">
+          {publicacion.nombre}
+        </div>
+        
+        {publicacion.textoPublicacion && (
+          <div className="text-gray-600 line-clamp-1 text-xs mb-1">
+            {publicacion.textoPublicacion}
+          </div>
+        )}
+        
+        <div className="flex items-center justify-between">
+          <div className="text-gray-500 text-xs">
+            {publicacion.creador.nombre}
+          </div>
+          {canEdit && (
+            <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAccion(publicacion.id, 'aprobar');
+                }}
+                className="w-4 h-4 bg-green-500 hover:bg-green-600 rounded text-white flex items-center justify-center"
+                title="Aprobar"
+              >
+                ✓
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // Función para renderizar cada card de publicación
   function renderPublicacionCard(publicacion: TareaPublicacion, canEdit: boolean) {
@@ -387,10 +745,6 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                 <CardTitle className="text-lg line-clamp-2 text-gray-900">
                   {publicacion.nombre}
                 </CardTitle>
-                <CardDescription className="text-sm flex items-center mt-1">
-                  <User className="w-3 h-3 mr-1" />
-                  {publicacion.creador.nombre}
-                </CardDescription>
               </div>
             </div>
             <Badge className={`${getEstadoColor(publicacion.estado)} font-medium`}>
@@ -639,13 +993,39 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                Portal de Revisión
+                {data.cliente.nombre}
               </h1>
               <p className="text-gray-600 mt-1">
-                Bienvenido, {data.cliente.nombre}
+                Bienvenido, {currentUser ? currentUser.nombre : 'Usuario'}
               </p>
             </div>
             <div className="flex items-center space-x-3">
+              {/* Pestañas de Vista */}
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setVistaActiva('lista')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    vistaActiva === 'lista'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <List className="h-4 w-4" />
+                  <span className="hidden sm:inline">Lista</span>
+                </button>
+                <button
+                  onClick={() => setVistaActiva('calendario')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    vistaActiva === 'calendario'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Calendar className="h-4 w-4" />
+                  <span className="hidden sm:inline">Calendario</span>
+                </button>
+              </div>
+
               <Button
                 variant="outline"
                 size="sm"
@@ -660,6 +1040,53 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   </Badge>
                 )}
               </Button>
+              
+              {/* Filtro rápido de meses sin mostrar panel completo */}
+              {!mostrarFiltros && (() => {
+                const mesesDisponibles = getMesesDisponibles();
+                return mesesDisponibles.length > 1 && (
+                  <>
+                    <div className="hidden md:flex items-center space-x-2">
+                      <span className="text-sm text-gray-600 font-medium">Mes:</span>
+                      <div className="flex space-x-1">
+                        <button
+                          onClick={() => setFiltros(prev => ({ ...prev, mes: '' }))}
+                          className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                            !filtros.mes 
+                              ? 'bg-blue-600 text-white' 
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          Todos
+                        </button>
+                        {mesesDisponibles.slice(0, 3).map((mes) => (
+                          <button
+                            key={mes.value}
+                            onClick={() => setFiltros(prev => ({ ...prev, mes: mes.value }))}
+                            className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                              filtros.mes === mes.value 
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {mes.label.split(' ')[0]}
+                          </button>
+                        ))}
+                        {mesesDisponibles.length > 3 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => setMostrarFiltros(true)}
+                          >
+                            +{mesesDisponibles.length - 3}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
               <Button
                 variant="outline"
                 size="sm"
@@ -682,13 +1109,13 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                 <span className="hidden sm:inline">Cerrar Sesión</span>
               </Button>
               <div className="flex space-x-2">
-                <Badge variant="secondary" className="text-sm">
+                <Badge variant="outline" className="text-sm border-yellow-300 text-yellow-700 bg-yellow-50">
                   {data.total?.porRevisar || 0} por revisar
                 </Badge>
-                <Badge variant="outline" className="text-sm border-orange-300 text-orange-700">
+                <Badge variant="outline" className="text-sm border-orange-300 text-orange-700 bg-orange-50">
                   {data.total?.pendientesCambios || 0} pendientes
                 </Badge>
-                <Badge variant="outline" className="text-sm border-green-300 text-green-700">
+                <Badge variant="outline" className="text-sm border-green-300 text-green-700 bg-green-50">
                   {data.total?.aprobadas || 0} aprobadas
                 </Badge>
               </div>
@@ -701,6 +1128,43 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
       {mostrarFiltros && (
         <div className="bg-white border-b shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            {/* Filtro rápido de meses - prominente */}
+            {(() => {
+              const mesesDisponibles = getMesesDisponibles();
+              return mesesDisponibles.length > 0 && (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Filtro rápido por mes
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setFiltros(prev => ({ ...prev, mes: '' }))}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        !filtros.mes 
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Todos los meses
+                    </button>
+                    {mesesDisponibles.map((mes) => (
+                      <button
+                        key={mes.value}
+                        onClick={() => setFiltros(prev => ({ ...prev, mes: mes.value }))}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          filtros.mes === mes.value 
+                            ? 'bg-blue-600 text-white' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {mes.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+            
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               {/* Búsqueda */}
               <div className="lg:col-span-2">
@@ -794,6 +1258,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                 {hayFiltrosActivos() && (
                   <>
                     Filtros activos: {[
+                      filtros.mes && `Mes: ${getMesesDisponibles().find(m => m.value === filtros.mes)?.label.split(' (')[0] || filtros.mes}`,
                       filtros.tipoPublicacion && `Tipo: ${filtros.tipoPublicacion}`,
                       filtros.plataforma && `Plataforma: ${filtros.plataforma}`,
                       filtros.busqueda && `Búsqueda: "${filtros.busqueda}"`,
@@ -820,7 +1285,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
       )}
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className={`${vistaActiva === 'calendario' ? 'w-full' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8 py-8`}>
         {(data.total?.total || 0) === 0 ? (
           <div className="text-center py-12">
             <div className="text-gray-500 text-6xl mb-4">📝</div>
@@ -831,6 +1296,156 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
               No se encontraron publicaciones en este momento.
             </p>
           </div>
+        ) : vistaActiva === 'calendario' ? (
+          // Vista de Calendario
+          <div className="bg-white rounded-lg shadow-lg">
+            {/* Header del Calendario */}
+            <div className="flex items-center justify-between p-6 border-b">
+              <div className="flex items-center space-x-4">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {fechaCalendario.toLocaleDateString('es-ES', { 
+                    month: 'long', 
+                    year: 'numeric' 
+                  })}
+                </h2>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navegarMes('anterior')}
+                    className="p-2"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navegarMes('siguiente')}
+                    className="p-2"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFechaCalendario(new Date())}
+                  >
+                    Hoy
+                  </Button>
+                </div>
+              </div>
+              <div className="text-sm text-gray-500">
+                {obtenerTodasPublicaciones().length} publicaciones
+                {hayFiltrosActivos() && (
+                  <span className="ml-1 text-blue-600 font-medium">(filtradas)</span>
+                )}
+              </div>
+            </div>
+
+            {/* Grid del Calendario */}
+            <div className="p-6">
+              {/* Header de días de la semana */}
+              <div className="grid grid-cols-7 gap-2 mb-4">
+                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dia, index) => (
+                  <div key={dia} className={`p-2 text-center text-sm font-semibold ${
+                    index >= 5 ? 'text-gray-500' : 'text-gray-700'
+                  }`}>
+                    {dia}
+                  </div>
+                ))}
+              </div>
+
+              {/* Grid de días */}
+              <div className="grid grid-cols-7 gap-2">
+                {obtenerDiasDelMes(fechaCalendario).map((diaInfo, index) => {
+                  // Usar directamente la fecha del calendario (ya tiene 12:00:00 para evitar offset)
+                  const publicacionesDelDia = obtenerPublicacionesPorFecha(diaInfo.fecha);
+                  const esHoy = diaInfo.fecha.toDateString() === new Date().toDateString();
+                  const esFinDeSemana = index % 7 >= 5; // Sábado (5) y Domingo (6)
+                  const fechaStr = diaInfo.fecha.toISOString().split('T')[0];
+                  const isDragOver = dragOverDay === fechaStr;
+                  
+                  // Log temporal para debug
+                  if (publicacionesDelDia.length > 0) {
+                    console.log(`📅 CALENDARIO DEBUG - Día ${diaInfo.fecha.getDate()}:`, {
+                      fechaDelDia: fechaStr,
+                      numeroDelDia: diaInfo.fecha.getDate(),
+                      publicaciones: publicacionesDelDia.map(p => p.nombre)
+                    });
+                  }
+                  
+
+                  
+                  return (
+                    <div
+                      key={index}
+                      onDragOver={(e) => handleDragOver(e, diaInfo.fecha)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, diaInfo.fecha)}
+                      className={`min-h-[120px] p-2 border rounded-lg transition-colors ${
+                        isDragOver
+                          ? 'bg-blue-100 border-blue-300 border-dashed border-2'
+                          : diaInfo.esDelMesActual
+                            ? esHoy 
+                              ? 'bg-blue-50 border-blue-200' 
+                              : esFinDeSemana
+                                ? 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                                : 'bg-white border-gray-200 hover:bg-gray-50'
+                            : esFinDeSemana
+                              ? 'bg-slate-100 border-slate-200'
+                              : 'bg-gray-50 border-gray-100'
+                      }`}
+                    >
+                      {/* Número del día */}
+                      <div className={`text-sm font-medium mb-2 ${
+                        diaInfo.esDelMesActual
+                          ? esHoy 
+                            ? 'text-blue-600' 
+                            : esFinDeSemana
+                              ? 'text-slate-600'
+                              : 'text-gray-900'
+                          : esFinDeSemana
+                            ? 'text-slate-400'
+                            : 'text-gray-400'
+                      }`}>
+                        {diaInfo.fecha.getDate()}
+                      </div>
+
+                      {/* Publicaciones del día */}
+                      <div className="space-y-1">
+                        {publicacionesDelDia.slice(0, 3).map((publicacion) => 
+                          renderPublicacionCardResumida(publicacion)
+                        )}
+                        
+                        {/* Indicador de más publicaciones */}
+                        {publicacionesDelDia.length > 3 && (
+                          <div className="text-xs text-gray-500 bg-gray-100 rounded px-2 py-1 text-center">
+                            +{publicacionesDelDia.length - 3} más
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Leyenda */}
+            <div className="flex items-center justify-center space-x-6 p-4 bg-gray-50 border-t">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                <span className="text-sm text-gray-600">Por revisar</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                <span className="text-sm text-gray-600">Pendientes cambios</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-gray-600">Aprobadas</span>
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="space-y-12">
             {/* Sección: Por revisar */}
@@ -840,7 +1455,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                 <section>
                   <div className="flex items-center mb-6">
                     <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                       <h2 className="text-2xl font-bold text-gray-900">
                         Por revisar ({publicacionesFiltradas.length})
                       </h2>
@@ -882,7 +1497,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   </div>
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {publicacionesFiltradas.map((publicacion) => (
-                      <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden border-l-4 border-l-orange-400">
+                                              <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden border-l-4 border-l-orange-500">
                         {renderPublicacionCard(publicacion, false)}
                       </Card>
                     ))}
@@ -911,7 +1526,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   </div>
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {publicacionesFiltradas.map((publicacion) => (
-                      <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden border-l-4 border-l-green-400">
+                                              <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden border-l-4 border-l-green-500">
                         {renderPublicacionCard(publicacion, false)}
                       </Card>
                     ))}

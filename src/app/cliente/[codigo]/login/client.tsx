@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { LoginForm } from '@/components/login-form';
+import { SimplePasswordLogin } from '@/components/simple-password-login';
 import { toast } from 'sonner';
 
 interface ClientLoginClientProps {
@@ -22,7 +22,9 @@ export function ClientLoginClient({ codigo }: ClientLoginClientProps) {
       });
 
       if (response.ok) {
-        toast.success('¡Bienvenido a tu portal!');
+        const data = await response.json();
+        const userName = data.user?.nombre || 'Usuario';
+        toast.success(`¡Bienvenido ${userName}!`);
         router.push(`/cliente/${codigo}`);
         router.refresh();
         return true;
@@ -36,11 +38,11 @@ export function ClientLoginClient({ codigo }: ClientLoginClientProps) {
   };
 
   return (
-    <LoginForm
+    <SimplePasswordLogin
       title={`Portal de Cliente`}
-      description={`Introduce tu contraseña para acceder a tu portal de publicaciones`}
+      description={`Introduce tu contraseña para acceder al portal`}
       onSubmit={handleLogin}
-      placeholder="Contraseña del portal"
+      placeholderPassword="Contraseña"
     />
   );
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClickUpService } from '@/lib/clickup';
 import { getSupabaseService } from '@/lib/supabase';
+import { getCurrentClientUser, logActivity } from '@/lib/auth';
 
 export async function POST(
   request: NextRequest,
@@ -44,6 +45,16 @@ export async function POST(
       );
     }
 
+    // Obtener información del usuario actual
+    const currentUser = await getCurrentClientUser();
+    
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'Usuario no autenticado' },
+        { status: 401 }
+      );
+    }
+
     const clickUpService = await getClickUpService();
 
     // Determinar el nuevo estado según la acción
@@ -53,7 +64,7 @@ export async function POST(
     switch (accion) {
       case 'aprobar':
         nuevoEstado = cliente.estadosAprobacion[0] || 'Aprobado';
-        mensajeComentario = `✅ Aprobado por ${cliente.nombre}`;
+        mensajeComentario = `✅ [${currentUser.nombre}]: Aprobado`;
         break;
       case 'hay_cambios':
         if (!comentario) {
@@ -63,7 +74,7 @@ export async function POST(
           );
         }
         nuevoEstado = cliente.estadosRechazo[0] || 'Hay cambios';
-        mensajeComentario = `🔄 ${cliente.nombre} solicita cambios: ${comentario}`;
+        mensajeComentario = `🔄 [${currentUser.nombre}]: ${comentario}`;
         break;
       default:
         return NextResponse.json(
@@ -80,26 +91,45 @@ export async function POST(
     // Agregar comentario en ClickUp
     await clickUpService.addComment(tareaId, mensajeComentario);
 
-    // Registrar acción en nuestra base de datos
-    await supabaseService.createAccionTarea({
+    // Registrar acción en nuestra base de datos con información del usuario
+    const accionCreada = await supabaseService.createAccionTarea({
       tareaId,
       clienteId: cliente.id,
+      usuarioId: currentUser.id,
       accion,
       comentario: comentario || mensajeComentario,
     });
 
     // Si hay cambios solicitados, también guardarlo en la tabla de comentarios
+    let comentarioCreado = null;
     if (accion === 'hay_cambios' && comentario) {
-      await supabaseService.createComentario({
+      comentarioCreado = await supabaseService.createComentario({
         tareaId,
         clienteId: cliente.id,
-        contenido: comentario,
+        usuarioId: currentUser.id,
+        contenido: `[${currentUser.nombre}]: ${comentario}`,
         autor: {
-          nombre: cliente.nombre,
-          email: cliente.email || '',
+          nombre: currentUser.nombre,
+          email: currentUser.email || '',
         },
       });
     }
+
+    // Registrar la actividad en el log
+    const ipAddress = request.ip || request.headers.get('x-forwarded-for')?.split(',')[0] || null;
+    const userAgent = request.headers.get('user-agent') || null;
+    
+    await logActivity(
+      currentUser.id,
+      cliente.id,
+      accion,
+      `Acción ${accion} en tarea ${tareaId}${comentario ? ': ' + comentario : ''}`,
+      tareaId,
+      comentarioCreado?.id,
+      accionCreada?.id,
+      ipAddress,
+      userAgent
+    );
 
     return NextResponse.json({
       success: true,

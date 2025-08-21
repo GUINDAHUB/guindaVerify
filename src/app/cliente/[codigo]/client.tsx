@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { CheckCircle, MessageCircle, User, RefreshCw, ExternalLink, FileText, Camera, Clock, Hash, Filter, X, LogOut, MessageSquare, Calendar, List, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckCircle, MessageCircle, User, RefreshCw, ExternalLink, FileText, Camera, Clock, Hash, Filter, X, LogOut, MessageSquare, Calendar, List, ChevronLeft, ChevronRight, Columns } from 'lucide-react';
 import { ComentariosModal } from '@/components/comentarios-modal';
 
 interface ClienteData {
@@ -42,7 +42,7 @@ interface Filtros {
   mes: string; // Nuevo filtro para mes
 }
 
-type VistaActiva = 'lista' | 'calendario';
+type VistaActiva = 'lista' | 'calendario' | 'kanban';
 
 interface ClientePortalClientProps {
   codigo: string;
@@ -1120,6 +1120,17 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   <Calendar className="h-4 w-4" />
                   <span className="hidden sm:inline">Calendario</span>
                 </button>
+                <button
+                  onClick={() => setVistaActiva('kanban')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    vistaActiva === 'kanban'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Columns className="h-4 w-4" />
+                  <span className="hidden sm:inline">Kanban</span>
+                </button>
               </div>
 
               <Button
@@ -1381,7 +1392,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
       )}
 
       {/* Content */}
-      <div className={`${vistaActiva === 'calendario' ? 'w-full' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8 py-8`}>
+      <div className={`${vistaActiva === 'calendario' || vistaActiva === 'kanban' ? 'w-full' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8 py-8`}>
         {(data.total?.total || 0) === 0 ? (
           <div className="text-center py-12">
             <div className="text-gray-500 text-6xl mb-4">📝</div>
@@ -1539,6 +1550,110 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                 <span className="text-sm text-gray-600">Aprobadas</span>
+              </div>
+            </div>
+          </div>
+        ) : vistaActiva === 'kanban' ? (
+          // Vista Kanban
+          <div className="h-full">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+              {/* Columna: Por Revisar */}
+              <div className="bg-yellow-50 rounded-lg border border-yellow-200">
+                <div className="p-4 border-b border-yellow-200 bg-yellow-100">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Por Revisar ({aplicarFiltros(data.publicacionesPorRevisar || []).length})
+                    </h3>
+                  </div>
+                </div>
+                <div className="p-4 space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto">
+                  {aplicarFiltros(data.publicacionesPorRevisar || [])
+                    .sort((a, b) => {
+                      // Ordenar por fecha más próxima primero
+                      if (!a.fechaProgramada && !b.fechaProgramada) return 0;
+                      if (!a.fechaProgramada) return 1;
+                      if (!b.fechaProgramada) return -1;
+                      return new Date(a.fechaProgramada).getTime() - new Date(b.fechaProgramada).getTime();
+                    })
+                    .map((publicacion) => (
+                      <Card key={publicacion.id} className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-yellow-500">
+                        {renderPublicacionCard(publicacion, true)}
+                      </Card>
+                    ))}
+                  {aplicarFiltros(data.publicacionesPorRevisar || []).length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <div className="text-4xl mb-2">📝</div>
+                      <p className="text-sm">No hay publicaciones por revisar</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Columna: Pendientes de Cambios */}
+              <div className="bg-orange-50 rounded-lg border border-orange-200">
+                <div className="p-4 border-b border-orange-200 bg-orange-100">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Pendientes de Cambios ({aplicarFiltros(data.publicacionesPendientesCambios || []).length})
+                    </h3>
+                  </div>
+                </div>
+                <div className="p-4 space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto">
+                  {aplicarFiltros(data.publicacionesPendientesCambios || [])
+                    .sort((a, b) => {
+                      // Ordenar por fecha más próxima primero
+                      if (!a.fechaProgramada && !b.fechaProgramada) return 0;
+                      if (!a.fechaProgramada) return 1;
+                      if (!b.fechaProgramada) return -1;
+                      return new Date(a.fechaProgramada).getTime() - new Date(b.fechaProgramada).getTime();
+                    })
+                    .map((publicacion) => (
+                      <Card key={publicacion.id} className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-orange-500">
+                        {renderPublicacionCard(publicacion, false)}
+                      </Card>
+                    ))}
+                  {aplicarFiltros(data.publicacionesPendientesCambios || []).length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <div className="text-4xl mb-2">🔄</div>
+                      <p className="text-sm">No hay publicaciones pendientes de cambios</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Columna: Aprobadas */}
+              <div className="bg-green-50 rounded-lg border border-green-200">
+                <div className="p-4 border-b border-green-200 bg-green-100">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Aprobadas ({aplicarFiltros(data.publicacionesAprobadas || []).length})
+                    </h3>
+                  </div>
+                </div>
+                <div className="p-4 space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto">
+                  {aplicarFiltros(data.publicacionesAprobadas || [])
+                    .sort((a, b) => {
+                      // Ordenar por fecha más próxima primero
+                      if (!a.fechaProgramada && !b.fechaProgramada) return 0;
+                      if (!a.fechaProgramada) return 1;
+                      if (!b.fechaProgramada) return -1;
+                      return new Date(a.fechaProgramada).getTime() - new Date(b.fechaProgramada).getTime();
+                    })
+                    .map((publicacion) => (
+                      <Card key={publicacion.id} className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-green-500">
+                        {renderPublicacionCard(publicacion, false)}
+                      </Card>
+                    ))}
+                  {aplicarFiltros(data.publicacionesAprobadas || []).length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <div className="text-4xl mb-2">✅</div>
+                      <p className="text-sm">No hay publicaciones aprobadas</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

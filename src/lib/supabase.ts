@@ -75,6 +75,7 @@ export class SupabaseService {
         codigo: cliente.codigo,
         nombre: cliente.nombre,
         email: cliente.email,
+        logo_url: cliente.logoUrl,
         clickup_list_id: cliente.clickupListId,
         estados_visibles: cliente.estadosVisibles,
         estados_aprobacion: cliente.estadosAprobacion,
@@ -108,6 +109,7 @@ export class SupabaseService {
       if (updates.codigo) updatesDB.codigo = updates.codigo;
       if (updates.nombre) updatesDB.nombre = updates.nombre;
       if (updates.email !== undefined) updatesDB.email = updates.email;
+      if (updates.logoUrl !== undefined) updatesDB.logo_url = updates.logoUrl;
       if (updates.clickupListId) updatesDB.clickup_list_id = updates.clickupListId;
       if (updates.estadosVisibles) updatesDB.estados_visibles = updates.estadosVisibles;
       if (updates.estadosAprobacion) updatesDB.estados_aprobacion = updates.estadosAprobacion;
@@ -161,6 +163,7 @@ export class SupabaseService {
       codigo: data.codigo,
       nombre: data.nombre,
       email: data.email,
+      logoUrl: data.logo_url,
       clickupListId: data.clickup_list_id,
       estadosVisibles: data.estados_visibles || [],
       estadosAprobacion: data.estados_aprobacion || [],
@@ -177,8 +180,8 @@ export class SupabaseService {
       const { data, error } = await supabase
         .from('comentarios')
         .select('*')
-        .eq('tareaId', tareaId)
-        .order('fechaCreacion', { ascending: false });
+        .eq('tarea_id', tareaId)
+        .order('fecha_creacion', { ascending: false });
 
       if (error) {
         console.error('Error obteniendo comentarios:', error);

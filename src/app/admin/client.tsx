@@ -22,6 +22,7 @@ export function AdminPageClient() {
     codigo: '',
     nombre: '',
     email: '',
+    logoUrl: '',
     clickupListId: '',
     estadosVisibles: '',
     estadosAprobacion: '',
@@ -237,6 +238,7 @@ export function AdminPageClient() {
       codigo: cliente.codigo,
       nombre: cliente.nombre,
       email: cliente.email || '',
+      logoUrl: cliente.logoUrl || '',
       clickupListId: cliente.clickupListId,
       estadosVisibles: cliente.estadosVisibles.join(', '),
       estadosAprobacion: cliente.estadosAprobacion.join(', '),
@@ -263,6 +265,7 @@ export function AdminPageClient() {
       codigo: '',
       nombre: '',
       email: '',
+      logoUrl: '',
       clickupListId: '',
       estadosVisibles: '',
       estadosAprobacion: '',
@@ -505,7 +508,7 @@ export function AdminPageClient() {
                   Nuevo Cliente
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>
                     {editingCliente ? 'Editar Cliente' : 'Nuevo Cliente'}
@@ -518,7 +521,7 @@ export function AdminPageClient() {
                   </DialogDescription>
                 </DialogHeader>
                 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="codigo">Código *</Label>
@@ -555,6 +558,43 @@ export function AdminPageClient() {
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
                         placeholder="cliente@ejemplo.com"
                       />
+                    </div>
+                    <div>
+                      <Label htmlFor="logoUrl">Logo URL</Label>
+                      <Input
+                        id="logoUrl"
+                        type="url"
+                        value={formData.logoUrl}
+                        onChange={(e) => setFormData({...formData, logoUrl: e.target.value})}
+                        placeholder="https://ejemplo.com/logo.png"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        URL del logo que aparecerá en el portal del cliente
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      {/* Vista previa del logo */}
+                      {formData.logoUrl && (
+                        <div className="mb-4">
+                          <Label>Vista previa del logo</Label>
+                          <div className="mt-2 p-4 border rounded-lg bg-gray-50 flex items-center justify-center">
+                            <img
+                              src={formData.logoUrl}
+                              alt="Vista previa del logo"
+                              className="max-h-16 max-w-48 object-contain"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                              onLoad={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'block';
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="clickupListId">Lista ClickUp *</Label>
@@ -707,8 +747,8 @@ export function AdminPageClient() {
                       )}
                     </div>
                   </div>
-
-                  <div className="flex justify-end space-x-2 pt-4">
+                  
+                  <div className="flex justify-end space-x-2 pt-6 mt-4">
                     <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                       Cancelar
                     </Button>

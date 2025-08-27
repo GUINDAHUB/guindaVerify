@@ -85,6 +85,7 @@ export async function GET(
         id: cliente.id,
         nombre: cliente.nombre,
         codigo: cliente.codigo,
+        logoUrl: cliente.logoUrl,
         clickupListId: cliente.clickupListId,
       },
       publicacionesPorRevisar: publicacionesPorRevisar || [],

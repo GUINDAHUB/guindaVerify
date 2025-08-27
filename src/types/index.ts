@@ -5,6 +5,7 @@ export interface Cliente {
   codigo: string; // Para la URL única
   nombre: string;
   email?: string;
+  logoUrl?: string; // URL del logo del cliente
   clickupListId: string;
   estadosVisibles: string[]; // Estados que aparecen en el portal
   estadosAprobacion: string[]; // Estados cuando aprueba

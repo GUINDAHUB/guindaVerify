@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { MessageCircle, RefreshCw, Clock, User } from 'lucide-react';
+import { MessageCircle, RefreshCw, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Comentario {
@@ -101,34 +101,17 @@ export function ComentariosModal({
     });
   };
 
-  const getComentarioIcon = (fuente: string, tipo: string) => {
-    if (fuente === 'sistema' && tipo === 'accion_cliente') {
-      return '👤'; // Acción del cliente
-    }
-    if (fuente === 'clickup') {
-      return '💬'; // Comentario de ClickUp
-    }
-    return '📝'; // Otros
-  };
-
   const getComentarioColor = (fuente: string, tipo: string) => {
     if (fuente === 'sistema' && tipo === 'accion_cliente') {
+      return 'bg-blue-50 border-blue-200';
+    }
+    if (fuente === 'cliente_via_clickup' && tipo === 'comentario_cliente') {
       return 'bg-blue-50 border-blue-200';
     }
     if (fuente === 'clickup') {
       return 'bg-gray-50 border-gray-200';
     }
     return 'bg-green-50 border-green-200';
-  };
-
-  const getBadgeVariant = (fuente: string, tipo: string): "default" | "secondary" | "destructive" | "outline" => {
-    if (fuente === 'sistema' && tipo === 'accion_cliente') {
-      return 'default';
-    }
-    if (fuente === 'clickup') {
-      return 'secondary';
-    }
-    return 'outline';
   };
 
   return (
@@ -199,45 +182,36 @@ export function ComentariosModal({
                     className={`p-4 rounded-lg border ${getComentarioColor(comentario.fuente, comentario.tipo)}`}
                   >
                     <div className="flex items-start space-x-3">
-                      <Avatar className="w-8 h-8 flex-shrink-0">
+                      {/* Foto de perfil */}
+                      <Avatar className="w-10 h-10 flex-shrink-0">
                         {comentario.autor.avatar ? (
-                          <AvatarImage src={comentario.autor.avatar} alt={comentario.autor.nombre} />
+                          <AvatarImage 
+                            src={comentario.autor.avatar} 
+                            alt={comentario.autor.nombre}
+                            className={comentario.fuente === 'cliente_via_clickup' || comentario.fuente === 'sistema' ? 'object-contain p-1' : ''}
+                          />
                         ) : null}
-                        <AvatarFallback className="text-xs">
+                        <AvatarFallback className="text-sm font-medium">
                           {comentario.autor.nombre.split(' ').map(n => n[0]).join('').toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       
                       <div className="flex-1 min-w-0">
+                        {/* Nombre del usuario y fecha */}
                         <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium text-sm text-gray-900">
-                              {comentario.autor.nombre}
-                            </span>
-                            <Badge 
-                              variant={getBadgeVariant(comentario.fuente, comentario.tipo)}
-                              className="text-xs"
-                            >
-                              {getComentarioIcon(comentario.fuente, comentario.tipo)}
-                              {comentario.fuente === 'sistema' ? 'Cliente' : 'ClickUp'}
-                            </Badge>
-                          </div>
+                          <span className="font-medium text-sm text-gray-900">
+                            {comentario.autor.nombre}
+                          </span>
                           <div className="flex items-center text-xs text-gray-500">
                             <Clock className="w-3 h-3 mr-1" />
                             {formatearFecha(comentario.fechaCreacion)}
                           </div>
                         </div>
                         
+                        {/* Contenido del mensaje */}
                         <div className="text-sm text-gray-700 whitespace-pre-wrap">
                           {comentario.contenido}
                         </div>
-                        
-                        {comentario.autor.email && (
-                          <div className="flex items-center text-xs text-gray-500 mt-2">
-                            <User className="w-3 h-3 mr-1" />
-                            {comentario.autor.email}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>

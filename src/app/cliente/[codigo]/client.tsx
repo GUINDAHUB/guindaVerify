@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { TareaPublicacion } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,13 +11,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { CheckCircle, MessageCircle, User, RefreshCw, ExternalLink, FileText, Camera, Clock, Hash, Filter, X, LogOut, MessageSquare, Calendar, List, ChevronLeft, ChevronRight, Columns } from 'lucide-react';
+import { CheckCircle, MessageCircle, User, RefreshCw, ExternalLink, FileText, Camera, Clock, Hash, Filter, X, LogOut, MessageSquare, Calendar, List, ChevronLeft, ChevronRight, Columns, Maximize2 } from 'lucide-react';
 import { ComentariosModal } from '@/components/comentarios-modal';
+import { PublicacionDetailModal } from '@/components/publicacion-detail-modal';
 
 interface ClienteData {
   id: string;
   nombre: string;
   codigo: string;
+  logoUrl?: string;
 }
 
 interface PublicacionesResponse {
@@ -75,10 +77,11 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     tareaId: '',
     tareaNombre: '',
   });
-  const [vistaActiva, setVistaActiva] = useState<VistaActiva>('lista');
+  const [vistaActiva, setVistaActiva] = useState<VistaActiva>('kanban');
   const [fechaCalendario, setFechaCalendario] = useState(new Date());
   const [draggedPublication, setDraggedPublication] = useState<TareaPublicacion | null>(null);
   const [dragOverDay, setDragOverDay] = useState<string | null>(null);
+  const [selectedPublicacion, setSelectedPublicacion] = useState<TareaPublicacion | null>(null);
 
   const fetchPublicaciones = useCallback(async (isRefresh = false) => {
     try {
@@ -505,6 +508,46 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     });
   };
 
+  const [comentariosData, setComentariosData] = useState<{[key: string]: any[]}>({});
+  const [loadingComentarios, setLoadingComentarios] = useState<{[key: string]: boolean}>({});
+  const loadingRef = useRef<{[key: string]: boolean}>({});
+
+  const fetchComentarios = useCallback(async (tareaId: string) => {
+    // Si ya está cargando, no hacer nada
+    if (loadingRef.current[tareaId]) {
+      return [];
+    }
+    
+    try {
+      loadingRef.current[tareaId] = true;
+      setLoadingComentarios(prev => ({ ...prev, [tareaId]: true }));
+      
+      const response = await fetch(`/api/cliente/${codigo}/comentarios/${tareaId}`);
+      
+      if (!response.ok) {
+        throw new Error('Error al obtener comentarios');
+      }
+      
+      const data = await response.json();
+      setComentariosData(prev => ({
+        ...prev,
+        [tareaId]: data.comentarios || []
+      }));
+      
+      return data.comentarios || [];
+    } catch (error) {
+      console.error('Error obteniendo comentarios:', error);
+      return [];
+    } finally {
+      loadingRef.current[tareaId] = false;
+      setLoadingComentarios(prev => ({ ...prev, [tareaId]: false }));
+    }
+  }, [codigo]);
+
+  const getComentarios = (tareaId: string) => {
+    return comentariosData[tareaId] || [];
+  };
+
   // Verificar si hay filtros activos
   const hayFiltrosActivos = () => {
     return filtros.tipoPublicacion || filtros.plataforma || filtros.fechaDesde || filtros.fechaHasta || filtros.busqueda || filtros.mes;
@@ -763,13 +806,25 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
               ))}
             </div>
           </div>
-          <div className={`w-2 h-2 rounded-full ${
-            canEdit 
-              ? 'bg-yellow-500' 
-              : publicacion.estado?.toLowerCase().includes('aprobado')
-                ? 'bg-green-500'
-                : 'bg-orange-500'
-          }`} />
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedPublicacion(publicacion);
+              }}
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600"
+              title="Ver detalles"
+            >
+              <Maximize2 className="w-3 h-3" />
+            </button>
+            <div className={`w-2 h-2 rounded-full ${
+              canEdit 
+                ? 'bg-yellow-500' 
+                : publicacion.estado?.toLowerCase().includes('aprobado')
+                  ? 'bg-green-500'
+                  : 'bg-orange-500'
+            }`} />
+          </div>
         </div>
         
         <div className="font-medium text-gray-900 line-clamp-2 text-xs mb-1 group-hover:text-gray-700">
@@ -830,9 +885,20 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                 </CardTitle>
               </div>
             </div>
-            <Badge className={`${getEstadoColor(publicacion.estado)} font-medium`}>
-              {publicacion.estado}
-            </Badge>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedPublicacion(publicacion)}
+                className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                title="Ver detalles completos"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </Button>
+              <Badge className={`${getEstadoColor(publicacion.estado)} font-medium`}>
+                {publicacion.estado}
+              </Badge>
+            </div>
           </div>
 
           {/* Tipo y Plataformas */}
@@ -1087,27 +1153,41 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+            {/* Logo del cliente - Solo a la izquierda */}
+            <div className="flex-shrink-0">
+              {data.cliente.logoUrl ? (
+                <img
+                  src={data.cliente.logoUrl}
+                  alt={`Logo de ${data.cliente.nombre}`}
+                  className="h-12 sm:h-14 w-auto max-w-48 sm:max-w-64 object-contain transition-all duration-200"
+                  onError={(e) => {
+                    // Si falla la carga del logo, mostrar el nombre como fallback
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    const fallback = (e.target as HTMLImageElement).nextElementSibling;
+                    if (fallback) {
+                      fallback.classList.remove('hidden');
+                    }
+                  }}
+                />
+              ) : null}
+              <h1 className={`text-2xl sm:text-3xl font-bold text-gray-900 ${data.cliente.logoUrl ? 'hidden' : ''}`}>
                 {data.cliente.nombre}
               </h1>
-              <p className="text-gray-600 mt-1">
-                Bienvenido, {currentUser ? currentUser.nombre : 'Usuario'}
-              </p>
             </div>
-            <div className="flex items-center space-x-3">
-              {/* Pestañas de Vista */}
+            
+            {/* Centro - Pestañas de Vista */}
+            <div className="flex items-center">
               <div className="flex bg-gray-100 rounded-lg p-1">
                 <button
-                  onClick={() => setVistaActiva('lista')}
+                  onClick={() => setVistaActiva('kanban')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    vistaActiva === 'lista'
+                    vistaActiva === 'kanban'
                       ? 'bg-white text-gray-900 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  <List className="h-4 w-4" />
-                  <span className="hidden sm:inline">Lista</span>
+                  <Columns className="h-4 w-4" />
+                  <span className="hidden sm:inline">Kanban</span>
                 </button>
                 <button
                   onClick={() => setVistaActiva('calendario')}
@@ -1121,17 +1201,50 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   <span className="hidden sm:inline">Calendario</span>
                 </button>
                 <button
-                  onClick={() => setVistaActiva('kanban')}
+                  onClick={() => setVistaActiva('lista')}
                   className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    vistaActiva === 'kanban'
+                    vistaActiva === 'lista'
                       ? 'bg-white text-gray-900 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  <Columns className="h-4 w-4" />
-                  <span className="hidden sm:inline">Kanban</span>
+                  <List className="h-4 w-4" />
+                  <span className="hidden sm:inline">Lista</span>
                 </button>
               </div>
+            </div>
+            
+            {/* Derecha - Usuario y Logout */}
+            <div className="flex items-center space-x-2">
+              {/* Botón de Logout - Solo icono */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="p-2"
+                title="Cerrar Sesión"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+              
+              {/* Usuario con icono */}
+              <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg">
+                <User className="h-4 w-4 text-gray-600" />
+                <span className="text-sm font-medium text-gray-900">
+                  {currentUser ? currentUser.nombre : 'Usuario'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className={`${vistaActiva === 'calendario' || vistaActiva === 'kanban' ? 'w-full' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8 py-8`}>
+        {/* Header con filtros y badges */}
+        <div className="">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
 
               <Button
                 variant="outline"
@@ -1206,26 +1319,19 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   {refreshing ? 'Actualizando...' : 'Actualizar'}
                 </span>
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-                className="flex items-center space-x-2"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Cerrar Sesión</span>
-              </Button>
-              <div className="flex space-x-2">
-                <Badge variant="outline" className="text-sm border-yellow-300 text-yellow-700 bg-yellow-50">
-                  {data.total?.porRevisar || 0} por revisar
-                </Badge>
-                <Badge variant="outline" className="text-sm border-orange-300 text-orange-700 bg-orange-50">
-                  {data.total?.pendientesCambios || 0} pendientes
-                </Badge>
-                <Badge variant="outline" className="text-sm border-green-300 text-green-700 bg-green-50">
-                  {data.total?.aprobadas || 0} aprobadas
-                </Badge>
-              </div>
+            </div>
+            
+            {/* Badges de estado */}
+            <div className="flex space-x-2">
+              <Badge variant="outline" className="text-sm border-yellow-300 text-yellow-700 bg-yellow-50">
+                {data.total?.porRevisar || 0} por revisar
+              </Badge>
+              <Badge variant="outline" className="text-sm border-orange-300 text-orange-700 bg-orange-50">
+                {data.total?.pendientesCambios || 0} pendientes
+              </Badge>
+              <Badge variant="outline" className="text-sm border-green-300 text-green-700 bg-green-50">
+                {data.total?.aprobadas || 0} aprobadas
+              </Badge>
             </div>
           </div>
         </div>
@@ -1555,19 +1661,25 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
           </div>
         ) : vistaActiva === 'kanban' ? (
           // Vista Kanban
-          <div className="h-full">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+          <div className="w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 relative">
+              {/* Separador vertical derecho */}
+              <div className="hidden lg:block absolute left-1/3 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent transform -translate-x-1/2 z-0"></div>
+              <div className="hidden lg:block absolute left-2/3 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent transform -translate-x-1/2 z-0"></div>
+
               {/* Columna: Por Revisar */}
-              <div className="bg-yellow-50 rounded-lg border border-yellow-200">
-                <div className="p-4 border-b border-yellow-200 bg-yellow-100">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Por Revisar ({aplicarFiltros(data.publicacionesPorRevisar || []).length})
-                    </h3>
+              <div className="space-y-4 relative z-10">
+                <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border border-yellow-200 rounded-lg shadow-sm">
+                  <div className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Por Revisar ({aplicarFiltros(data.publicacionesPorRevisar || []).length})
+                      </h3>
+                    </div>
                   </div>
                 </div>
-                <div className="p-4 space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto">
+                <div className="space-y-4">
                   {aplicarFiltros(data.publicacionesPorRevisar || [])
                     .sort((a, b) => {
                       // Ordenar por fecha más próxima primero
@@ -1577,7 +1689,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                       return new Date(a.fechaProgramada).getTime() - new Date(b.fechaProgramada).getTime();
                     })
                     .map((publicacion) => (
-                      <Card key={publicacion.id} className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-yellow-500">
+                      <Card key={publicacion.id} className="hover:shadow-lg transition-all duration-300 border-l-4" style={{ borderLeftColor: '#eab308' }}>
                         {renderPublicacionCard(publicacion, true)}
                       </Card>
                     ))}
@@ -1591,16 +1703,18 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
               </div>
 
               {/* Columna: Pendientes de Cambios */}
-              <div className="bg-orange-50 rounded-lg border border-orange-200">
-                <div className="p-4 border-b border-orange-200 bg-orange-100">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Pendientes de Cambios ({aplicarFiltros(data.publicacionesPendientesCambios || []).length})
-                    </h3>
+              <div className="space-y-4 relative z-10">
+                <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border border-orange-200 rounded-lg shadow-sm">
+                  <div className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Pendientes de Cambios ({aplicarFiltros(data.publicacionesPendientesCambios || []).length})
+                      </h3>
+                    </div>
                   </div>
                 </div>
-                <div className="p-4 space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto">
+                <div className="space-y-4">
                   {aplicarFiltros(data.publicacionesPendientesCambios || [])
                     .sort((a, b) => {
                       // Ordenar por fecha más próxima primero
@@ -1610,7 +1724,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                       return new Date(a.fechaProgramada).getTime() - new Date(b.fechaProgramada).getTime();
                     })
                     .map((publicacion) => (
-                      <Card key={publicacion.id} className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-orange-500">
+                      <Card key={publicacion.id} className="hover:shadow-lg transition-all duration-300 border-l-4" style={{ borderLeftColor: '#f97316' }}>
                         {renderPublicacionCard(publicacion, false)}
                       </Card>
                     ))}
@@ -1624,16 +1738,18 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
               </div>
 
               {/* Columna: Aprobadas */}
-              <div className="bg-green-50 rounded-lg border border-green-200">
-                <div className="p-4 border-b border-green-200 bg-green-100">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Aprobadas ({aplicarFiltros(data.publicacionesAprobadas || []).length})
-                    </h3>
+              <div className="space-y-4 relative z-10">
+                <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border border-green-200 rounded-lg shadow-sm">
+                  <div className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Aprobadas ({aplicarFiltros(data.publicacionesAprobadas || []).length})
+                      </h3>
+                    </div>
                   </div>
                 </div>
-                <div className="p-4 space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto">
+                <div className="space-y-4">
                   {aplicarFiltros(data.publicacionesAprobadas || [])
                     .sort((a, b) => {
                       // Ordenar por fecha más próxima primero
@@ -1643,7 +1759,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                       return new Date(a.fechaProgramada).getTime() - new Date(b.fechaProgramada).getTime();
                     })
                     .map((publicacion) => (
-                      <Card key={publicacion.id} className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-green-500">
+                      <Card key={publicacion.id} className="hover:shadow-lg transition-all duration-300 border-l-4" style={{ borderLeftColor: '#22c55e' }}>
                         {renderPublicacionCard(publicacion, false)}
                       </Card>
                     ))}
@@ -1679,7 +1795,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   </div>
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {publicacionesFiltradas.map((publicacion) => (
-                      <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden">
+                      <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden border-l-4" style={{ borderLeftColor: '#eab308' }}>
                         {renderPublicacionCard(publicacion, true)}
                       </Card>
                     ))}
@@ -1708,7 +1824,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   </div>
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {publicacionesFiltradas.map((publicacion) => (
-                                              <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden border-l-4 border-l-orange-500">
+                                              <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden border-l-4" style={{ borderLeftColor: '#f97316' }}>
                         {renderPublicacionCard(publicacion, false)}
                       </Card>
                     ))}
@@ -1737,7 +1853,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   </div>
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {publicacionesFiltradas.map((publicacion) => (
-                                              <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden border-l-4 border-l-green-500">
+                                              <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden border-l-4" style={{ borderLeftColor: '#22c55e' }}>
                         {renderPublicacionCard(publicacion, false)}
                       </Card>
                     ))}
@@ -1803,6 +1919,25 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         tareaNombre={comentariosModal.tareaNombre}
         clienteCodigo={codigo}
       />
+
+      {/* Modal de detalles de publicación */}
+      {selectedPublicacion && (
+        <PublicacionDetailModal
+          isOpen={!!selectedPublicacion}
+          onClose={() => setSelectedPublicacion(null)}
+          publicacion={selectedPublicacion}
+          comentarios={getComentarios(selectedPublicacion.id)}
+          onAprobar={() => handleAccion(selectedPublicacion.id, 'aprobar')}
+          onSolicitarCambios={(comentario) => {
+            setComentario(comentario);
+            handleAccion(selectedPublicacion.id, 'hay_cambios');
+          }}
+          actionLoading={actionLoading === selectedPublicacion.id}
+          canEdit={data?.publicacionesPorRevisar?.some(p => p.id === selectedPublicacion.id) || false}
+          fetchComentarios={fetchComentarios}
+          loadingComentarios={loadingComentarios[selectedPublicacion.id] || false}
+        />
+      )}
     </div>
   );
 }

@@ -22,7 +22,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { codigo, nombre, email, clickupListId, estadosVisibles, estadosAprobacion, estadosRechazo } = body;
+    const { codigo, nombre, email, logoUrl, clickupListId, estadosVisibles, estadosAprobacion, estadosRechazo } = body;
 
     // Validaciones básicas
     if (!codigo || !nombre || !clickupListId) {
@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       codigo,
       nombre,
       email: email || null,
+      logoUrl: logoUrl || null,
       clickupListId,
       estadosVisibles: estadosVisibles || [],
       estadosAprobacion: estadosAprobacion || [],

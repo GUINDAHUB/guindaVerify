@@ -143,6 +143,9 @@ export interface TareaPublicacion {
   enlaceDrive?: string;
   comentarios?: string;
   urlPublicacion?: string;
+  // Nuevos campos
+  descripcionPublicacion?: string;  // Copy para el pie de publicación en redes
+  urlStories?: string;  // URL para las stories
 }
 
 export interface UsuarioCliente {

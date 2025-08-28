@@ -347,6 +347,8 @@ export class ClickUpService {
     const enlaceDrive = this.extractEnlaceDrive(task);
     const comentarios = this.extractComentarios(task);
     const urlPublicacion = this.extractUrlPublicacion(task);
+    const descripcionPublicacion = this.extractDescripcionPublicacion(task);
+    const urlStories = this.extractUrlStories(task);
 
     return {
       id: task.id,
@@ -379,6 +381,8 @@ export class ClickUpService {
       enlaceDrive,
       comentarios,
       urlPublicacion,
+      descripcionPublicacion,
+      urlStories,
     };
   }
 
@@ -810,6 +814,39 @@ export class ClickUpService {
     
     if (campoUrl && campoUrl.value) {
       return campoUrl.value.toString();
+    }
+
+    return undefined;
+  }
+
+  private extractDescripcionPublicacion(task: ClickUpTask): string | undefined {
+    // Buscar en campos personalizados de descripción de publicación
+    const campoDescripcion = task.custom_fields.find(field => 
+      field.name.toLowerCase().includes('descripcion') ||
+      field.name.toLowerCase().includes('descripción') ||
+      field.name.toLowerCase().includes('copy') ||
+      field.name.toLowerCase().includes('pie') ||
+      (field.name.toLowerCase().includes('texto') && field.name.toLowerCase().includes('red'))
+    );
+    
+    if (campoDescripcion && campoDescripcion.value) {
+      return campoDescripcion.value.toString();
+    }
+
+    return undefined;
+  }
+
+  private extractUrlStories(task: ClickUpTask): string | undefined {
+    // Buscar en campos personalizados de URL de stories
+    const campoUrlStories = task.custom_fields.find(field => 
+      field.name.toLowerCase().includes('stories') ||
+      field.name.toLowerCase().includes('story') ||
+      (field.name.toLowerCase().includes('url') && field.name.toLowerCase().includes('stories')) ||
+      (field.name.toLowerCase().includes('enlace') && field.name.toLowerCase().includes('stories'))
+    );
+    
+    if (campoUrlStories && campoUrlStories.value) {
+      return campoUrlStories.value.toString();
     }
 
     return undefined;

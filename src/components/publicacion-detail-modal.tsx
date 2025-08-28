@@ -23,6 +23,7 @@ import {
   Zap
 } from 'lucide-react';
 import { TareaPublicacion, Comentario } from '@/types';
+import { formatClickUpDate } from '@/lib/utils';
 
 interface PublicacionDetailModalProps {
   isOpen: boolean;
@@ -72,20 +73,7 @@ export function PublicacionDetailModal({
     }
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'No especificada';
-    try {
-      return new Date(dateString).toLocaleDateString('es-ES', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return 'Fecha inválida';
-    }
-  };
+
 
   const getEstadoColor = (estado: string) => {
     switch (estado.toLowerCase()) {
@@ -123,7 +111,7 @@ export function PublicacionDetailModal({
                   {publicacion.fechaProgramada && (
                     <div className="flex items-center text-sm text-gray-600">
                       <Calendar className="w-4 h-4 mr-1" />
-                      {formatDate(publicacion.fechaProgramada)}
+                      {formatClickUpDate(publicacion.fechaProgramada)}
                     </div>
                   )}
                 </div>
@@ -137,19 +125,6 @@ export function PublicacionDetailModal({
                     </h3>
                     <div className="bg-gray-50 rounded-lg p-4">
                       <p className="text-gray-700 whitespace-pre-wrap">{publicacion.descripcion}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Texto de Publicación */}
-                {publicacion.textoPublicacion && (
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                      <MessageCircle className="w-5 h-5 mr-2" />
-                      Texto de la Publicación
-                    </h3>
-                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                      <p className="text-gray-800 whitespace-pre-wrap">{publicacion.textoPublicacion}</p>
                     </div>
                   </div>
                 )}
@@ -186,34 +161,68 @@ export function PublicacionDetailModal({
                   </div>
                 </div>
 
+                {/* Texto de Publicación */}
+                {publicacion.textoPublicacion && (
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                      <MessageCircle className="w-5 h-5 mr-2" />
+                      Texto de la Publicación
+                    </h3>
+                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                      <p className="text-gray-800 whitespace-pre-wrap">{publicacion.textoPublicacion}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Descripción de la Publicación (Copy para redes) */}
+                {publicacion.descripcionPublicacion && (
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                      <FileText className="w-5 h-5 mr-2" />
+                      Copy para Redes Sociales
+                    </h3>
+                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                      <p className="text-gray-800 whitespace-pre-wrap">{publicacion.descripcionPublicacion}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* URL de Stories */}
+                {publicacion.urlStories && (
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                      <Link className="w-5 h-5 mr-2" />
+                      URL para Stories
+                    </h3>
+                    <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                      <a 
+                        href={publicacion.urlStories} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-purple-700 hover:text-purple-900 underline break-all"
+                      >
+                        {publicacion.urlStories}
+                      </a>
+                    </div>
+                  </div>
+                )}
+
                 {/* Enlaces */}
-                {(publicacion.enlaceDrive || publicacion.urlPublicacion) && (
+                {publicacion.enlaceDrive && (
                   <div className="space-y-3">
                     <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                       <Link className="w-5 h-5 mr-2" />
                       Enlaces
                     </h3>
                     <div className="space-y-2">
-                      {publicacion.enlaceDrive && (
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start"
-                          onClick={() => window.open(publicacion.enlaceDrive, '_blank')}
-                        >
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          Ver archivos en Drive
-                        </Button>
-                      )}
-                      {publicacion.urlPublicacion && (
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start"
-                          onClick={() => window.open(publicacion.urlPublicacion, '_blank')}
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Ver publicación en línea
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => window.open(publicacion.enlaceDrive, '_blank')}
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Ver archivos en Drive
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -227,11 +236,11 @@ export function PublicacionDetailModal({
                   <div className="grid grid-cols-1 gap-3 text-sm">
                     <div className="flex justify-between py-2 border-b border-gray-100">
                       <span className="text-gray-500">Creado:</span>
-                      <span className="text-gray-900">{formatDate(publicacion.fechaCreacion)}</span>
+                      <span className="text-gray-900">{formatClickUpDate(publicacion.fechaCreacion)}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-gray-100">
                       <span className="text-gray-500">Última actualización:</span>
-                      <span className="text-gray-900">{formatDate(publicacion.fechaActualizacion)}</span>
+                      <span className="text-gray-900">{formatClickUpDate(publicacion.fechaActualizacion)}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-gray-100">
                       <span className="text-gray-500">Creador:</span>
@@ -307,7 +316,7 @@ export function PublicacionDetailModal({
                               {comentario.autor.nombre}
                             </div>
                             <div className="text-xs text-gray-500">
-                              {formatDate(comentario.fechaCreacion.toString())}
+                              {formatClickUpDate(comentario.fechaCreacion.toString())}
                             </div>
                           </div>
                           <p className="text-sm text-gray-700 whitespace-pre-wrap">

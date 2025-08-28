@@ -169,7 +169,7 @@ export async function verifyClientPassword(codigo: string, password: string): Pr
 
 // Gestión de sesiones de administrador
 export async function setAdminSession(): Promise<void> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   cookieStore.set(AUTH_COOKIE, 'authenticated', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -179,19 +179,19 @@ export async function setAdminSession(): Promise<void> {
 }
 
 export async function clearAdminSession(): Promise<void> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   cookieStore.delete(AUTH_COOKIE);
 }
 
 export async function isAdminAuthenticated(): Promise<boolean> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const authCookie = cookieStore.get(AUTH_COOKIE);
   return authCookie?.value === 'authenticated';
 }
 
 // Gestión de sesiones de cliente (nueva versión con usuarios)
 export async function setClientUserSession(codigo: string, user: any): Promise<void> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   
   // Mantener compatibilidad con código de cliente
   cookieStore.set(CLIENT_AUTH_COOKIE, codigo, {
@@ -211,7 +211,7 @@ export async function setClientUserSession(codigo: string, user: any): Promise<v
 }
 
 export async function setClientSession(codigo: string): Promise<void> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   cookieStore.set(CLIENT_AUTH_COOKIE, codigo, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -221,20 +221,20 @@ export async function setClientSession(codigo: string): Promise<void> {
 }
 
 export async function clearClientSession(): Promise<void> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   cookieStore.delete(CLIENT_AUTH_COOKIE);
   cookieStore.delete(CLIENT_USER_COOKIE);
 }
 
 export async function getClientSession(): Promise<string | null> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const authCookie = cookieStore.get(CLIENT_AUTH_COOKIE);
   return authCookie?.value || null;
 }
 
 export async function getCurrentClientUser(): Promise<any | null> {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const userCookie = cookieStore.get(CLIENT_USER_COOKIE);
     
     if (!userCookie?.value) {
@@ -249,13 +249,13 @@ export async function getCurrentClientUser(): Promise<any | null> {
 }
 
 export async function isClientAuthenticated(codigo: string): Promise<boolean> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const authCookie = cookieStore.get(CLIENT_AUTH_COOKIE);
   return authCookie?.value === codigo;
 }
 
 export async function isClientUserAuthenticated(codigo: string): Promise<{ isAuthenticated: boolean; user?: any }> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const authCookie = cookieStore.get(CLIENT_AUTH_COOKIE);
   const userCookie = cookieStore.get(CLIENT_USER_COOKIE);
   

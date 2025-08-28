@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { CheckCircle, MessageCircle, User, RefreshCw, ExternalLink, FileText, Camera, Clock, Hash, Filter, X, LogOut, MessageSquare, Calendar, List, ChevronLeft, ChevronRight, Columns, Maximize2, HelpCircle } from 'lucide-react';
 import { ComentariosModal } from '@/components/comentarios-modal';
 import { PublicacionDetailModal } from '@/components/publicacion-detail-modal';
+import { parseClickUpDate, formatClickUpDateToISO } from '@/lib/utils';
 
 interface ClienteData {
   id: string;
@@ -573,11 +574,8 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     const resultado = todasPublicaciones.filter(pub => {
       if (!pub.fechaProgramada) return false;
       try {
-        // Si la fecha ya está en formato YYYY-MM-DD, usarla directamente
-        let fechaPub = pub.fechaProgramada;
-        if (fechaPub.includes('T') || fechaPub.length > 10) {
-          fechaPub = new Date(pub.fechaProgramada).toISOString().split('T')[0];
-        }
+        // Usar la función utility para convertir fechas de ClickUp correctamente
+        const fechaPub = formatClickUpDateToISO(pub.fechaProgramada);
         
         return fechaPub === fechaStr;
       } catch {
@@ -680,10 +678,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     if (!draggedPublication) return;
     
     const nuevaFecha = fecha.toISOString().split('T')[0];
-    const fechaActual = draggedPublication.fechaProgramada ? 
-      (draggedPublication.fechaProgramada.includes('T') || draggedPublication.fechaProgramada.length > 10 
-        ? new Date(draggedPublication.fechaProgramada).toISOString().split('T')[0] 
-        : draggedPublication.fechaProgramada) : null;
+    const fechaActual = formatClickUpDateToISO(draggedPublication.fechaProgramada);
     
     // Si es la misma fecha, no hacer nada
     if (fechaActual === nuevaFecha) {

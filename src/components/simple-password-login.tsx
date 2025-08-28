@@ -6,19 +6,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Eye, EyeOff } from 'lucide-react';
+import Image from 'next/image';
 
 interface SimplePasswordLoginProps {
   title: string;
   description: string;
   onSubmit: (password: string) => Promise<boolean>;
   placeholderPassword?: string;
+  logoUrl?: string;
+  clientName?: string;
 }
 
 export function SimplePasswordLogin({
   title,
   description,
   onSubmit,
-  placeholderPassword = "Contraseña"
+  placeholderPassword = "Contraseña",
+  logoUrl,
+  clientName
 }: SimplePasswordLoginProps) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -52,7 +57,19 @@ export function SimplePasswordLogin({
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
+        <CardHeader className="space-y-4">
+          {logoUrl && (
+            <div className="flex justify-center">
+              <Image
+                src={logoUrl}
+                alt={`Logo de ${clientName || 'Cliente'}`}
+                width={120}
+                height={120}
+                className="drop-shadow-lg"
+                priority
+              />
+            </div>
+          )}
           <CardTitle className="text-2xl font-bold text-center">{title}</CardTitle>
           <CardDescription className="text-center">{description}</CardDescription>
         </CardHeader>

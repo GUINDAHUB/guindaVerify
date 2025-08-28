@@ -10,6 +10,7 @@ import { Home, Users, Settings, ArrowLeft, LogOut, Key, FileText, Bug } from "lu
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
+import Image from "next/image";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -110,7 +111,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center">
               <Button 
                 variant="outline" 
                 size="sm"
@@ -119,15 +120,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Volver al Inicio
               </Button>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  Panel de Administración
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  Gestiona clientes y configuración del sistema
-                </p>
-              </div>
             </div>
+            
+            <div className="flex justify-center items-center">
+              <Image
+                src="/logo.png"
+                alt="GuindaVerify Logo"
+                width={150}
+                height={150}
+                className="drop-shadow-lg"
+                priority
+              />
+            </div>
+            
             <div className="flex items-center space-x-3">
               <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
                 <DialogTrigger asChild>

@@ -51,6 +51,29 @@ interface ClientePortalClientProps {
   codigo: string;
 }
 
+// Helper function para manejar respuestas de API de forma segura
+const handleApiResponse = async (response: Response, defaultErrorMessage: string) => {
+  if (!response.ok) {
+    let errorMessage = defaultErrorMessage;
+    try {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } else {
+        const textResponse = await response.text();
+        console.error('Respuesta no-JSON del servidor:', textResponse);
+        errorMessage = `Error del servidor (${response.status})`;
+      }
+    } catch (parseError) {
+      console.error('Error parseando respuesta de error:', parseError);
+      errorMessage = `Error del servidor (${response.status})`;
+    }
+    throw new Error(errorMessage);
+  }
+  return response.json();
+};
+
 export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
   const [data, setData] = useState<PublicacionesResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -98,13 +121,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
       console.log(`🔄 Fetching publicaciones: ${url}`);
       
       const response = await fetch(url);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error cargando publicaciones');
-      }
-
-      const data = await response.json();
+      const data = await handleApiResponse(response, 'Error cargando publicaciones');
       console.log('📊 Datos recibidos de la API:', data);
       setData(data);
       
@@ -179,12 +196,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         body: JSON.stringify(body),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error procesando acción');
-      }
-
-      const result = await response.json();
+      const result = await handleApiResponse(response, 'Error procesando acción');
       toast.success(result.mensaje);
 
       // Recargar publicaciones
@@ -226,12 +238,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         body: JSON.stringify({ tareaId }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error refrescando la tarea');
-      }
-
-      const result = await response.json();
+      const result = await handleApiResponse(response, 'Error refrescando la tarea');
       console.log('✅ Tarea refrescada:', result.publicacion);
 
       // Actualizar solo esta publicación específica en el estado
@@ -699,12 +706,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error actualizando fecha');
-      }
-
-      const result = await response.json();
+      const result = await handleApiResponse(response, 'Error actualizando fecha');
       console.log('✅ Fecha actualizada:', result);
       toast.success(`Publicación movida a ${fecha.toLocaleDateString('es-ES')}`);
 
@@ -779,13 +781,13 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         draggable={true}
         onDragStart={(e) => handleDragStart(e, publicacion)}
         onDragEnd={handleDragEnd}
-        className={`p-2 rounded-lg text-xs cursor-move transition-all duration-200 hover:shadow-md group ${
+        className={`p-2 rounded-lg text-xs cursor-move transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 group ${
           canEdit 
-            ? 'bg-yellow-100 border-yellow-300 hover:bg-yellow-200' 
+            ? 'bg-gradient-to-br from-amber-100/80 to-yellow-100/80 border-amber-300/50 hover:bg-gradient-to-br hover:from-amber-200/80 hover:to-yellow-200/80 backdrop-blur-sm' 
             : publicacion.estado?.toLowerCase().includes('aprobado')
-              ? 'bg-green-100 border-green-300 hover:bg-green-200'
-              : 'bg-orange-100 border-orange-300 hover:bg-orange-200'
-        } border active:cursor-grabbing`}
+              ? 'bg-gradient-to-br from-emerald-100/80 to-green-100/80 border-emerald-300/50 hover:bg-gradient-to-br hover:from-emerald-200/80 hover:to-green-200/80 backdrop-blur-sm'
+              : 'bg-gradient-to-br from-orange-100/80 to-red-100/80 border-orange-300/50 hover:bg-gradient-to-br hover:from-orange-200/80 hover:to-red-200/80 backdrop-blur-sm'
+        } border active:cursor-grabbing shadow-sm`}
         onClick={() => abrirComentarios(publicacion)}
         title="Arrastra para cambiar fecha"
       >
@@ -931,7 +933,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
           {/* Texto de la publicación */}
           {publicacion.textoPublicacion && (
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg border-l-4 border-blue-400">
+            <div className="mb-4 p-3 bg-gradient-to-r from-gray-50/80 to-slate-50/80 backdrop-blur-sm rounded-xl border-l-4 border-blue-400">
               <div className="flex items-start space-x-2">
                 <FileText className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-gray-700 line-clamp-3">
@@ -945,7 +947,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
           <div className="space-y-2 mb-4">
             {/* Fecha programada */}
             {publicacion.fechaProgramada && (
-              <div className="flex items-center text-sm text-gray-600 bg-amber-50 px-3 py-2 rounded-lg">
+              <div className="flex items-center text-sm text-gray-600 bg-gradient-to-r from-amber-50/80 to-yellow-50/80 backdrop-blur-sm px-3 py-2 rounded-xl border border-amber-200/50">
                 <Clock className="w-4 h-4 mr-2 text-amber-600" />
                 <span className="font-medium">Fecha programada:</span>
                 <span className="ml-2">
@@ -972,7 +974,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
             {/* Enlace a Drive */}
             {publicacion.enlaceDrive && (
-              <div className="flex items-center justify-between bg-green-50 px-3 py-2 rounded-lg">
+              <div className="flex items-center justify-between bg-gradient-to-r from-emerald-50/80 to-green-50/80 backdrop-blur-sm px-3 py-2 rounded-xl border border-emerald-200/50">
                 <div className="flex items-center text-sm text-gray-700">
                   <Camera className="w-4 h-4 mr-2 text-green-600" />
                   <span className="font-medium">Archivos multimedia</span>
@@ -991,7 +993,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
             {/* Comentarios internos */}
             {publicacion.comentarios && (
-              <div className="bg-blue-50 px-3 py-2 rounded-lg border-l-4 border-blue-400">
+              <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 backdrop-blur-sm px-3 py-2 rounded-xl border-l-4 border-blue-400">
                 <div className="flex items-start space-x-2">
                   <MessageCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                   <div>
@@ -1119,7 +1121,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Cargando publicaciones...</p>
         </div>
       </div>
@@ -1144,9 +1146,9 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
   if (!data) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-white/80 backdrop-blur-xl shadow-sm border-b border-gray-200/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             {/* Logo del cliente - Solo a la izquierda */}
@@ -1236,7 +1238,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
       </div>
 
       {/* Content */}
-      <div className={`${vistaActiva === 'calendario' || vistaActiva === 'kanban' ? 'w-full' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8 py-8`}>
+      <div className={`${vistaActiva === 'calendario' ? 'w-full' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8 py-8`}>
         {/* Header con filtros y badges */}
         <div className="">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1504,7 +1506,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
       )}
 
       {/* Content */}
-      <div className={`${vistaActiva === 'calendario' || vistaActiva === 'kanban' ? 'w-full' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8 py-8`}>
+      <div className={`${vistaActiva === 'calendario' ? 'w-full' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8 py-8`}>
         {(data.total?.total || 0) === 0 ? (
           <div className="text-center py-12">
             <div className="text-gray-500 text-6xl mb-4">📝</div>
@@ -1517,7 +1519,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
           </div>
         ) : vistaActiva === 'calendario' ? (
           // Vista de Calendario
-          <div className="bg-white rounded-lg shadow-lg">
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50">
             {/* Header del Calendario */}
             <div className="flex items-center justify-between p-6 border-b">
               <div className="flex items-center space-x-4">
@@ -1675,12 +1677,12 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
               {/* Columna: Por Revisar */}
               <div className="space-y-4 relative z-10">
-                <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border border-yellow-200 rounded-lg shadow-sm">
+                <div className="sticky top-0 z-10 bg-gradient-to-r from-amber-400 to-yellow-500 backdrop-blur-xl border-2 border-amber-300 rounded-xl shadow-2xl shadow-amber-500/30 hover:shadow-amber-500/50 transition-all duration-300 hover:scale-105">
                   <div className="p-4">
                     <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Por Revisar ({aplicarFiltros(data.publicacionesPorRevisar || []).length})
+                      <div className="w-4 h-4 bg-white rounded-full shadow-md animate-pulse"></div>
+                      <h3 className="text-xl font-bold text-white drop-shadow-md">
+                        📝 Por Revisar ({aplicarFiltros(data.publicacionesPorRevisar || []).length})
                       </h3>
                     </div>
                   </div>
@@ -1695,7 +1697,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                       return new Date(a.fechaProgramada).getTime() - new Date(b.fechaProgramada).getTime();
                     })
                     .map((publicacion) => (
-                      <Card key={publicacion.id} className="hover:shadow-lg transition-all duration-300 border-l-4" style={{ borderLeftColor: '#eab308' }}>
+                      <Card key={publicacion.id} className="group hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-300 border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:-translate-y-1 border-l-4 border-l-amber-400">
                         {renderPublicacionCard(publicacion, true)}
                       </Card>
                     ))}
@@ -1710,12 +1712,12 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
               {/* Columna: Pendientes de Cambios */}
               <div className="space-y-4 relative z-10">
-                <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border border-orange-200 rounded-lg shadow-sm">
+                <div className="sticky top-0 z-10 bg-gradient-to-r from-orange-500 to-red-500 backdrop-blur-xl border-2 border-orange-400 rounded-xl shadow-2xl shadow-orange-500/30 hover:shadow-orange-500/50 transition-all duration-300 hover:scale-105">
                   <div className="p-4">
                     <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Pendientes de Cambios ({aplicarFiltros(data.publicacionesPendientesCambios || []).length})
+                      <div className="w-4 h-4 bg-white rounded-full shadow-md animate-pulse"></div>
+                      <h3 className="text-xl font-bold text-white drop-shadow-md">
+                        🔄 Pendientes de Cambios ({aplicarFiltros(data.publicacionesPendientesCambios || []).length})
                       </h3>
                     </div>
                   </div>
@@ -1730,7 +1732,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                       return new Date(a.fechaProgramada).getTime() - new Date(b.fechaProgramada).getTime();
                     })
                     .map((publicacion) => (
-                      <Card key={publicacion.id} className="hover:shadow-lg transition-all duration-300 border-l-4" style={{ borderLeftColor: '#f97316' }}>
+                      <Card key={publicacion.id} className="group hover:shadow-2xl hover:shadow-orange-500/10 transition-all duration-300 border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:-translate-y-1 border-l-4 border-l-orange-400">
                         {renderPublicacionCard(publicacion, false)}
                       </Card>
                     ))}
@@ -1745,12 +1747,12 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
               {/* Columna: Aprobadas */}
               <div className="space-y-4 relative z-10">
-                <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border border-green-200 rounded-lg shadow-sm">
+                <div className="sticky top-0 z-10 bg-gradient-to-r from-emerald-500 to-green-600 backdrop-blur-xl border-2 border-emerald-400 rounded-xl shadow-2xl shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all duration-300 hover:scale-105">
                   <div className="p-4">
                     <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Aprobadas ({aplicarFiltros(data.publicacionesAprobadas || []).length})
+                      <div className="w-4 h-4 bg-white rounded-full shadow-md animate-pulse"></div>
+                      <h3 className="text-xl font-bold text-white drop-shadow-md">
+                        ✅ Aprobadas ({aplicarFiltros(data.publicacionesAprobadas || []).length})
                       </h3>
                     </div>
                   </div>
@@ -1765,7 +1767,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                       return new Date(a.fechaProgramada).getTime() - new Date(b.fechaProgramada).getTime();
                     })
                     .map((publicacion) => (
-                      <Card key={publicacion.id} className="hover:shadow-lg transition-all duration-300 border-l-4" style={{ borderLeftColor: '#22c55e' }}>
+                      <Card key={publicacion.id} className="group hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300 border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:-translate-y-1 border-l-4 border-l-emerald-400">
                         {renderPublicacionCard(publicacion, false)}
                       </Card>
                     ))}
@@ -1801,7 +1803,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   </div>
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {publicacionesFiltradas.map((publicacion) => (
-                      <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden border-l-4" style={{ borderLeftColor: '#eab308' }}>
+                      <Card key={publicacion.id} className="group hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-300 border-0 bg-white/70 backdrop-blur-sm shadow-lg overflow-hidden hover:-translate-y-1 border-l-4 border-l-amber-400">
                         {renderPublicacionCard(publicacion, true)}
                       </Card>
                     ))}
@@ -1830,7 +1832,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   </div>
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {publicacionesFiltradas.map((publicacion) => (
-                                              <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden border-l-4" style={{ borderLeftColor: '#f97316' }}>
+                                              <Card key={publicacion.id} className="group hover:shadow-2xl hover:shadow-orange-500/10 transition-all duration-300 border-0 bg-white/70 backdrop-blur-sm shadow-lg overflow-hidden hover:-translate-y-1 border-l-4 border-l-orange-400">
                         {renderPublicacionCard(publicacion, false)}
                       </Card>
                     ))}
@@ -1859,7 +1861,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   </div>
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {publicacionesFiltradas.map((publicacion) => (
-                                              <Card key={publicacion.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-lg overflow-hidden border-l-4" style={{ borderLeftColor: '#22c55e' }}>
+                                              <Card key={publicacion.id} className="group hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300 border-0 bg-white/70 backdrop-blur-sm shadow-lg overflow-hidden hover:-translate-y-1 border-l-4 border-l-emerald-400">
                         {renderPublicacionCard(publicacion, false)}
                       </Card>
                     ))}

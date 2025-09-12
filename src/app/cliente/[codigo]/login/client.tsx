@@ -20,8 +20,13 @@ export function ClientLoginClient({ codigo }: ClientLoginClientProps) {
       try {
         const response = await fetch(`/api/cliente/${codigo}`);
         if (response.ok) {
-          const clienteData = await response.json();
-          setCliente(clienteData);
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const clienteData = await response.json();
+            setCliente(clienteData);
+          } else {
+            console.error('Respuesta no-JSON del servidor al obtener cliente');
+          }
         }
       } catch (error) {
         console.error('Error al obtener información del cliente:', error);
@@ -44,12 +49,18 @@ export function ClientLoginClient({ codigo }: ClientLoginClientProps) {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        const userName = data.user?.nombre || 'Usuario';
-        toast.success(`¡Bienvenido ${userName}!`);
-        router.push(`/cliente/${codigo}`);
-        router.refresh();
-        return true;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          const userName = data.user?.nombre || 'Usuario';
+          toast.success(`¡Bienvenido ${userName}!`);
+          router.push(`/cliente/${codigo}`);
+          router.refresh();
+          return true;
+        } else {
+          console.error('Respuesta no-JSON del servidor en login');
+          return false;
+        }
       } else {
         return false;
       }

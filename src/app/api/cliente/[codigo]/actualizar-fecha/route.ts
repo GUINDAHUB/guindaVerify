@@ -74,7 +74,7 @@ export async function PUT(
       currentUser.id,
       cliente.id,
       'cambio_fecha',
-      `Fecha de publicación cambiada a ${nuevaFecha}`,
+      `Fecha límite cambiada a ${nuevaFecha}`,
       tareaId,
       null,
       null,

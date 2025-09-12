@@ -175,52 +175,32 @@ export class ClickUpService {
     }
   }
 
-  // Actualizar la fecha de publicación (campo personalizado)
+  // Actualizar la fecha límite (campo estándar de ClickUp)
   async updateTaskDueDate(taskId: string, dueDate: number): Promise<void> {
     try {
-      // Primero, obtener la tarea para encontrar el campo personalizado de fecha
-      const task = await this.getTask(taskId);
-      
-      // Buscar el campo de fecha de publicación
-      const campoFecha = task.custom_fields.find(field => 
-        field.name.toLowerCase().includes('fecha') && 
-        (field.name.toLowerCase().includes('publicacion') || 
-         field.name.toLowerCase().includes('publicación'))
-      );
-
-      if (!campoFecha) {
-        console.error('❌ No se encontró campo de fecha de publicación:', {
-          taskId,
-          availableFields: task.custom_fields.map(f => ({ name: f.name, type: f.type, id: f.id }))
-        });
-        throw new Error('No se encontró el campo personalizado de fecha de publicación');
-      }
-
-      console.log('🔍 Campo de fecha encontrado:', {
-        fieldId: campoFecha.id,
-        fieldName: campoFecha.name,
-        fieldType: campoFecha.type,
-        currentValue: campoFecha.value
+      console.log('🔍 Actualizando fecha límite de la tarea:', {
+        taskId,
+        dueDate,
+        fechaComprensible: new Date(dueDate).toISOString()
       });
 
-      // Actualizar el campo personalizado usando la API específica
-      const response = await axios.post(
-        `${CLICKUP_API_BASE}/task/${taskId}/field/${campoFecha.id}`,
-        { value: dueDate },
+      // Actualizar la fecha límite usando la API estándar de ClickUp
+      const response = await axios.put(
+        `${CLICKUP_API_BASE}/task/${taskId}`,
+        { due_date: dueDate },
         { headers: this.getHeaders() }
       );
 
-      console.log('✅ ClickUp API - Campo personalizado actualizado:', {
+      console.log('✅ ClickUp API - Fecha límite actualizada:', {
         status: response.status,
         data: response.data,
-        fieldId: campoFecha.id,
-        fieldName: campoFecha.name,
-        newValue: dueDate,
+        taskId,
+        newDueDate: dueDate,
         fechaComprensible: new Date(dueDate).toISOString()
       });
 
     } catch (error: any) {
-      console.error('❌ ClickUp API - Error actualizando campo personalizado:', {
+      console.error('❌ ClickUp API - Error actualizando fecha límite:', {
         message: error.message,
         status: error.response?.status,
         statusText: error.response?.statusText,
@@ -228,7 +208,7 @@ export class ClickUpService {
         taskId,
         dueDate
       });
-      throw new Error(`No se pudo actualizar la fecha de publicación: ${error.message}`);
+      throw new Error(`No se pudo actualizar la fecha límite: ${error.message}`);
     }
   }
 
@@ -682,17 +662,20 @@ export class ClickUpService {
     let fechaRaw: string | undefined;
     let fuente = '';
     
-    if (campoFecha && campoFecha.value !== null && campoFecha.value !== undefined) {
-      fechaRaw = campoFecha.value.toString();
-      fuente = `campo personalizado '${campoFecha.name}' (tipo: ${campoFecha.type})`;
-      console.log(`✅ Fecha encontrada en ${fuente}:`, { raw: fechaRaw, originalValue: campoFecha.value });
-    } else if (task.due_date) {
+    // Priorizar el campo estándar due_date sobre los campos personalizados
+    if (task.due_date) {
       fechaRaw = task.due_date;
-      fuente = 'due_date de la tarea';
+      fuente = 'due_date de la tarea (campo estándar)';
       console.log(`✅ Fecha encontrada en ${fuente}:`, fechaRaw);
+    } else if (campoFecha && campoFecha.value !== null && campoFecha.value !== undefined) {
+      fechaRaw = campoFecha.value.toString();
+      fuente = `campo personalizado '${campoFecha.name}' (tipo: ${campoFecha.type}) - FALLBACK`;
+      console.log(`⚠️ Fecha encontrada en ${fuente}:`, { raw: fechaRaw, originalValue: campoFecha.value });
+      console.log(`💡 Recomendación: Migrar a usar el campo estándar 'fecha límite' de ClickUp`);
     } else {
       console.log(`❌ No se encontró fecha en ninguna fuente para tarea: ${task.name}`);
-      console.log(`🔍 Campos disponibles:`, task.custom_fields.map(f => f.name));
+      console.log(`🔍 Due date:`, task.due_date);
+      console.log(`🔍 Campos personalizados disponibles:`, task.custom_fields.map(f => ({ name: f.name, type: f.type, value: f.value })));
       return undefined;
     }
 

@@ -8,7 +8,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { codigo, nombre, email, logoUrl, clickupListId, estadosVisibles, estadosAprobacion, estadosRechazo } = body;
+    const { codigo, nombre, email, logoUrl, clickupListId, estadosVisibles, estadosAprobacion, estadosRechazo, dragDropEnabled } = body;
 
     // Validaciones básicas
     if (!codigo || !nombre || !clickupListId) {
@@ -50,6 +50,7 @@ export async function PUT(
       estadosVisibles: estadosVisibles || [],
       estadosAprobacion: estadosAprobacion || [],
       estadosRechazo: estadosRechazo || [],
+      dragDropEnabled: dragDropEnabled ?? true,
     });
 
     if (!clienteActualizado) {

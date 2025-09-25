@@ -80,7 +80,8 @@ export class SupabaseService {
         estados_visibles: cliente.estadosVisibles,
         estados_aprobacion: cliente.estadosAprobacion,
         estados_rechazo: cliente.estadosRechazo,
-        activo: cliente.activo
+        activo: cliente.activo,
+        drag_drop_enabled: cliente.dragDropEnabled ?? true
       };
 
       const { data, error } = await supabase
@@ -115,6 +116,7 @@ export class SupabaseService {
       if (updates.estadosAprobacion) updatesDB.estados_aprobacion = updates.estadosAprobacion;
       if (updates.estadosRechazo) updatesDB.estados_rechazo = updates.estadosRechazo;
       if (updates.activo !== undefined) updatesDB.activo = updates.activo;
+      if (updates.dragDropEnabled !== undefined) updatesDB.drag_drop_enabled = updates.dragDropEnabled;
       
       updatesDB.updated_at = new Date().toISOString();
 
@@ -169,6 +171,7 @@ export class SupabaseService {
       estadosAprobacion: data.estados_aprobacion || [],
       estadosRechazo: data.estados_rechazo || [],
       activo: data.activo,
+      dragDropEnabled: data.drag_drop_enabled ?? true,
       createdAt: new Date(data.created_at),
       updatedAt: new Date(data.updated_at)
     };

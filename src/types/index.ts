@@ -11,6 +11,7 @@ export interface Cliente {
   estadosAprobacion: string[]; // Estados cuando aprueba
   estadosRechazo: string[]; // Estados cuando rechaza
   activo: boolean;
+  dragDropEnabled?: boolean; // Permite arrastrar publicaciones en el calendario
   createdAt: Date;
   updatedAt: Date;
 }

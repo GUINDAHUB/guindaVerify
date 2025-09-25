@@ -87,6 +87,7 @@ export async function GET(
         codigo: cliente.codigo,
         logoUrl: cliente.logoUrl,
         clickupListId: cliente.clickupListId,
+        dragDropEnabled: cliente.dragDropEnabled ?? true,
       },
       publicacionesPorRevisar: publicacionesPorRevisar || [],
       publicacionesPendientesCambios: publicacionesPendientesCambios || [], 

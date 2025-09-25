@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash2, Users, Settings, Eye, RefreshCw, UserPlus } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Edit, Trash2, Users, Settings, Eye, RefreshCw, UserPlus, Move } from "lucide-react";
 import { toast } from "sonner";
 import { Cliente } from '@/types';
 import AdminLayout from '@/components/admin-layout';
@@ -26,7 +27,8 @@ export function AdminPageClient() {
     clickupListId: '',
     estadosVisibles: '',
     estadosAprobacion: '',
-    estadosRechazo: ''
+    estadosRechazo: '',
+    dragDropEnabled: true
   });
 
   // Nuevos estados para ClickUp
@@ -243,6 +245,7 @@ export function AdminPageClient() {
       estadosVisibles: cliente.estadosVisibles.join(', '),
       estadosAprobacion: cliente.estadosAprobacion.join(', '),
       estadosRechazo: cliente.estadosRechazo.join(', '),
+      dragDropEnabled: cliente.dragDropEnabled ?? true,
     });
     
     // Configurar los estados seleccionados para el modo edición
@@ -269,7 +272,8 @@ export function AdminPageClient() {
       clickupListId: '',
       estadosVisibles: '',
       estadosAprobacion: '',
-      estadosRechazo: ''
+      estadosRechazo: '',
+      dragDropEnabled: true
     });
     
     // Limpiar los nuevos estados
@@ -745,6 +749,32 @@ export function AdminPageClient() {
                           {selectedEstadosRechazo.join(', ')}
                         </p>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Configuraciones adicionales */}
+                  <div className="border-t pt-4 mt-6">
+                    <h4 className="text-sm font-medium text-gray-900 mb-4">Configuraciones del Portal</h4>
+                    
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+                      <div className="flex items-center space-x-3">
+                        <Move className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <Label htmlFor="dragDropEnabled" className="text-sm font-medium">
+                            Arrastrar y Soltar en Calendario
+                          </Label>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Permite a los clientes mover publicaciones arrastrando en la vista de calendario
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        id="dragDropEnabled"
+                        checked={!!formData.dragDropEnabled}
+                        onCheckedChange={(checked) => {
+                          setFormData(prev => ({...prev, dragDropEnabled: checked}));
+                        }}
+                      />
                     </div>
                   </div>
                   

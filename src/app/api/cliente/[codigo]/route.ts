@@ -32,7 +32,8 @@ export async function GET(
       codigo: cliente.codigo,
       nombre: cliente.nombre,
       logoUrl: cliente.logoUrl,
-      activo: cliente.activo
+      activo: cliente.activo,
+      dragDropEnabled: cliente.dragDropEnabled ?? true
     });
 
   } catch (error) {

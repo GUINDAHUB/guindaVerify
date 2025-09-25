@@ -22,7 +22,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { codigo, nombre, email, logoUrl, clickupListId, estadosVisibles, estadosAprobacion, estadosRechazo } = body;
+    const { codigo, nombre, email, logoUrl, clickupListId, estadosVisibles, estadosAprobacion, estadosRechazo, dragDropEnabled } = body;
 
     // Validaciones básicas
     if (!codigo || !nombre || !clickupListId) {
@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
       estadosAprobacion: estadosAprobacion || [],
       estadosRechazo: estadosRechazo || [],
       activo: true,
+      dragDropEnabled: dragDropEnabled ?? true,
     });
 
     if (!nuevoCliente) {

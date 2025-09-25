@@ -11,9 +11,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { CheckCircle, MessageCircle, User, RefreshCw, ExternalLink, FileText, Camera, Clock, Hash, Filter, X, LogOut, MessageSquare, Calendar, List, ChevronLeft, ChevronRight, Columns, Maximize2, HelpCircle } from 'lucide-react';
+import { CheckCircle, MessageCircle, User, RefreshCw, ExternalLink, FileText, Camera, Clock, Hash, Filter, X, LogOut, MessageSquare, Calendar, ChevronLeft, ChevronRight, Columns, Maximize2, HelpCircle, Move } from 'lucide-react';
 import { ComentariosModal } from '@/components/comentarios-modal';
 import { PublicacionDetailModal } from '@/components/publicacion-detail-modal';
+import { WikiModal } from '@/components/wiki-modal';
 import { parseClickUpDate, formatClickUpDateToISO } from '@/lib/utils';
 
 interface ClienteData {
@@ -21,6 +22,7 @@ interface ClienteData {
   nombre: string;
   codigo: string;
   logoUrl?: string;
+  dragDropEnabled?: boolean;
 }
 
 interface PublicacionesResponse {
@@ -45,7 +47,7 @@ interface Filtros {
   mes: string; // Nuevo filtro para mes
 }
 
-type VistaActiva = 'lista' | 'calendario' | 'kanban';
+type VistaActiva = 'calendario' | 'kanban';
 
 interface ClientePortalClientProps {
   codigo: string;
@@ -107,6 +109,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
   const [dragOverDay, setDragOverDay] = useState<string | null>(null);
   const [selectedPublicacion, setSelectedPublicacion] = useState<TareaPublicacion | null>(null);
   const [showWikiModal, setShowWikiModal] = useState(false);
+  const [selectedDayMobile, setSelectedDayMobile] = useState<Date | null>(null);
 
   const fetchPublicaciones = useCallback(async (isRefresh = false) => {
     try {
@@ -562,6 +565,32 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     return filtros.tipoPublicacion || filtros.plataforma || filtros.fechaDesde || filtros.fechaHasta || filtros.busqueda || filtros.mes;
   };
 
+  // Función para obtener puntitos de colores por día (móvil)
+  const obtenerPuntitosPorDia = (fecha: Date) => {
+    const publicacionesDelDia = obtenerPublicacionesPorFecha(fecha);
+    const puntitos = [];
+    
+    // Contar por estado
+    const porRevisar = publicacionesDelDia.filter(pub => 
+      data?.publicacionesPorRevisar?.some(p => p.id === pub.id)
+    ).length;
+    
+    const pendientesCambios = publicacionesDelDia.filter(pub => 
+      data?.publicacionesPendientesCambios?.some(p => p.id === pub.id)
+    ).length;
+    
+    const aprobadas = publicacionesDelDia.filter(pub => 
+      data?.publicacionesAprobadas?.some(p => p.id === pub.id)
+    ).length;
+
+    // Añadir puntitos por prioridad (máximo 3 puntitos visibles)
+    if (porRevisar > 0) puntitos.push('🟡');
+    if (pendientesCambios > 0) puntitos.push('🟠');
+    if (aprobadas > 0) puntitos.push('🟢');
+    
+    return puntitos.slice(0, 3); // Máximo 3 puntitos
+  };
+
   // Funciones para el calendario
   const obtenerTodasPublicaciones = (): TareaPublicacion[] => {
     if (!data) return [];
@@ -771,25 +800,70 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     }
   };
 
+  // Función para renderizar una publicación en móvil (expandida)
+  const renderPublicacionCardMobile = (publicacion: TareaPublicacion) => {
+    return (
+      <div
+        key={publicacion.id}
+        className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm"
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm font-medium text-gray-900 truncate">
+              {publicacion.nombre}
+            </h4>
+            <p className="text-xs text-gray-500 mt-1">
+              {publicacion.plataformaPublicacion?.join(', ') || 'Sin plataforma'} • {publicacion.tipoPublicacion || 'Sin tipo'}
+            </p>
+            {publicacion.fechaProgramada && (
+              <p className="text-xs text-gray-400 mt-1">
+                📅 {new Date(publicacion.fechaProgramada).toLocaleDateString('es-ES')}
+              </p>
+            )}
+          </div>
+          <div className="flex space-x-1 ml-2">
+            <button
+              onClick={() => setSelectedPublicacion(publicacion)}
+              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+              title="Ver detalles"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => abrirComentarios(publicacion)}
+              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors"
+              title="Ver comentarios"
+            >
+              <MessageSquare className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Función para renderizar tarjeta resumida para calendario
   function renderPublicacionCardResumida(publicacion: TareaPublicacion) {
     const canEdit = data?.publicacionesPorRevisar?.some(p => p.id === publicacion.id) || false;
+    const dragDropEnabled = data?.cliente.dragDropEnabled ?? true;
     
     return (
       <div 
         key={publicacion.id}
-        draggable={true}
-        onDragStart={(e) => handleDragStart(e, publicacion)}
-        onDragEnd={handleDragEnd}
-        className={`p-2 rounded-lg text-xs cursor-move transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 group ${
+        draggable={dragDropEnabled}
+        onDragStart={dragDropEnabled ? (e) => handleDragStart(e, publicacion) : undefined}
+        onDragEnd={dragDropEnabled ? handleDragEnd : undefined}
+        className={`p-2 rounded-lg text-xs transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 group ${
+          dragDropEnabled ? 'cursor-move' : 'cursor-pointer'
+        } ${
           canEdit 
             ? 'bg-gradient-to-br from-amber-100/80 to-yellow-100/80 border-amber-300/50 hover:bg-gradient-to-br hover:from-amber-200/80 hover:to-yellow-200/80 backdrop-blur-sm' 
             : publicacion.estado?.toLowerCase().includes('aprobado')
               ? 'bg-gradient-to-br from-emerald-100/80 to-green-100/80 border-emerald-300/50 hover:bg-gradient-to-br hover:from-emerald-200/80 hover:to-green-200/80 backdrop-blur-sm'
               : 'bg-gradient-to-br from-orange-100/80 to-red-100/80 border-orange-300/50 hover:bg-gradient-to-br hover:from-orange-200/80 hover:to-red-200/80 backdrop-blur-sm'
-        } border active:cursor-grabbing shadow-sm`}
-        onClick={() => abrirComentarios(publicacion)}
-        title="Arrastra para cambiar fecha"
+        } border ${dragDropEnabled ? 'active:cursor-grabbing' : ''} shadow-sm`}
+        onClick={() => dragDropEnabled ? abrirComentarios(publicacion) : setSelectedPublicacion(publicacion)}
+        title={dragDropEnabled ? "Arrastra para cambiar fecha" : "Click para ver detalles"}
       >
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center space-x-1">
@@ -805,16 +879,30 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
             </div>
           </div>
           <div className="flex items-center space-x-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedPublicacion(publicacion);
-              }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600"
-              title="Ver detalles"
-            >
-              <Maximize2 className="w-3 h-3" />
-            </button>
+            {dragDropEnabled && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPublicacion(publicacion);
+                }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600"
+                title="Ver detalles"
+              >
+                <Maximize2 className="w-3 h-3" />
+              </button>
+            )}
+            {!dragDropEnabled && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  abrirComentarios(publicacion);
+                }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600"
+                title="Ver comentarios"
+              >
+                <MessageSquare className="w-3 h-3" />
+              </button>
+            )}
             <div className={`w-2 h-2 rounded-full ${
               canEdit 
                 ? 'bg-yellow-500' 
@@ -1149,88 +1237,84 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-xl shadow-sm border-b border-gray-200/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            {/* Logo del cliente - Solo a la izquierda */}
-            <div className="flex-shrink-0">
-              {data.cliente.logoUrl ? (
-                <img
-                  src={data.cliente.logoUrl}
-                  alt={`Logo de ${data.cliente.nombre}`}
-                  className="h-12 sm:h-14 w-auto max-w-48 sm:max-w-64 object-contain transition-all duration-200"
-                  onError={(e) => {
-                    // Si falla la carga del logo, mostrar el nombre como fallback
-                    (e.target as HTMLImageElement).style.display = 'none';
-                    const fallback = (e.target as HTMLImageElement).nextElementSibling;
-                    if (fallback) {
-                      fallback.classList.remove('hidden');
-                    }
-                  }}
-                />
-              ) : null}
-              <h1 className={`text-2xl sm:text-3xl font-bold text-gray-900 ${data.cliente.logoUrl ? 'hidden' : ''}`}>
-                {data.cliente.nombre}
-              </h1>
-            </div>
-            
-            {/* Centro - Pestañas de Vista */}
-            <div className="flex items-center">
-              <div className="flex bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => setVistaActiva('kanban')}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    vistaActiva === 'kanban'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Columns className="h-4 w-4" />
-                  <span className="hidden sm:inline">Kanban</span>
-                </button>
-                <button
-                  onClick={() => setVistaActiva('calendario')}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    vistaActiva === 'calendario'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Calendar className="h-4 w-4" />
-                  <span className="hidden sm:inline">Calendario</span>
-                </button>
-                <button
-                  onClick={() => setVistaActiva('lista')}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    vistaActiva === 'lista'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <List className="h-4 w-4" />
-                  <span className="hidden sm:inline">Lista</span>
-                </button>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          {/* Layout de 2 filas en móvil, 1 fila en desktop */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            {/* Primera fila (móvil) / Izquierda (desktop): Logo */}
+            <div className="flex justify-center sm:justify-start">
+              <div className="flex-shrink-0">
+                {data.cliente.logoUrl ? (
+                  <img
+                    src={data.cliente.logoUrl}
+                    alt={`Logo de ${data.cliente.nombre}`}
+                    className="h-10 sm:h-10 md:h-12 w-auto max-w-full object-contain transition-all duration-200"
+                    style={{ maxWidth: '100%', maxHeight: '3rem' }}
+                    onError={(e) => {
+                      // Si falla la carga del logo, mostrar el nombre como fallback
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      const fallback = (e.target as HTMLImageElement).nextElementSibling;
+                      if (fallback) {
+                        fallback.classList.remove('hidden');
+                      }
+                    }}
+                  />
+                ) : null}
+                <h1 className={`text-xl sm:text-xl md:text-2xl font-bold text-gray-900 text-center sm:text-left ${data.cliente.logoUrl ? 'hidden' : ''}`}>
+                  {data.cliente.nombre}
+                </h1>
               </div>
             </div>
-            
-            {/* Derecha - Usuario y Logout */}
-            <div className="flex items-center space-x-2">
-              {/* Botón de Logout - Solo icono */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-                className="p-2"
-                title="Cerrar Sesión"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
+
+            {/* Segunda fila (móvil) / Derecha (desktop): Botones */}
+            <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
+              {/* Pestañas de Vista */}
+              <div className="flex items-center">
+                <div className="flex bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setVistaActiva('kanban')}
+                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      vistaActiva === 'kanban'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Columns className="h-4 w-4" />
+                    <span className="hidden md:inline">Kanban</span>
+                  </button>
+                  <button
+                    onClick={() => setVistaActiva('calendario')}
+                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      vistaActiva === 'calendario'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Calendar className="h-4 w-4" />
+                    <span className="hidden md:inline">Calendario</span>
+                  </button>
+                </div>
+              </div>
               
-              {/* Usuario con icono */}
-              <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg">
-                <User className="h-4 w-4 text-gray-600" />
-                <span className="text-sm font-medium text-gray-900">
-                  {currentUser ? currentUser.nombre : 'Usuario'}
-                </span>
+              {/* Usuario y Logout */}
+              <div className="flex items-center space-x-2">
+                {/* Botón de Logout */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="p-2"
+                  title="Cerrar Sesión"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+                
+                {/* Usuario */}
+                <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg">
+                  <User className="h-4 w-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-900">
+                    {currentUser ? currentUser.nombre : 'Usuario'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -1242,13 +1326,13 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         {/* Header con filtros y badges */}
         <div className="">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
 
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setMostrarFiltros(!mostrarFiltros)}
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 flex-shrink-0"
               >
                 <Filter className="h-4 w-4" />
                 <span className="hidden sm:inline">Filtros</span>
@@ -1310,7 +1394,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                 size="sm"
                 onClick={handleRefreshClick}
                 disabled={refreshing}
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 flex-shrink-0"
               >
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">
@@ -1322,7 +1406,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowWikiModal(true)}
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 flex-shrink-0"
               >
                 <HelpCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">Wiki</span>
@@ -1520,6 +1604,8 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         ) : vistaActiva === 'calendario' ? (
           // Vista de Calendario
           <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50">
+            {/* Vista Desktop */}
+            <div className="hidden md:block">
             {/* Header del Calendario */}
             <div className="flex items-center justify-between p-6 border-b">
               <div className="flex items-center space-x-4">
@@ -1585,6 +1671,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   const esFinDeSemana = index % 7 >= 5; // Sábado (5) y Domingo (6)
                   const fechaStr = diaInfo.fecha.toISOString().split('T')[0];
                   const isDragOver = dragOverDay === fechaStr;
+                  const dragDropEnabled = data?.cliente.dragDropEnabled ?? true;
                   
                   // Log temporal para debug
                   if (publicacionesDelDia.length > 0) {
@@ -1600,11 +1687,11 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   return (
                     <div
                       key={index}
-                      onDragOver={(e) => handleDragOver(e, diaInfo.fecha)}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, diaInfo.fecha)}
+                      onDragOver={dragDropEnabled ? (e) => handleDragOver(e, diaInfo.fecha) : undefined}
+                      onDragLeave={dragDropEnabled ? handleDragLeave : undefined}
+                      onDrop={dragDropEnabled ? (e) => handleDrop(e, diaInfo.fecha) : undefined}
                       className={`min-h-[120px] p-2 border rounded-lg transition-colors ${
-                        isDragOver
+                        isDragOver && dragDropEnabled
                           ? 'bg-blue-100 border-blue-300 border-dashed border-2'
                           : diaInfo.esDelMesActual
                             ? esHoy 
@@ -1652,23 +1739,245 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
             </div>
 
             {/* Leyenda */}
-            <div className="flex items-center justify-center space-x-6 p-4 bg-gray-50 border-t">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                <span className="text-sm text-gray-600">Por revisar</span>
+            <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-6 p-4 bg-gray-50 border-t">
+              <div className="flex items-center space-x-6">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                  <span className="text-sm text-gray-600">Por revisar</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                  <span className="text-sm text-gray-600">Pendientes cambios</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-sm text-gray-600">Aprobadas</span>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                <span className="text-sm text-gray-600">Pendientes cambios</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-gray-600">Aprobadas</span>
-              </div>
+              {!(data?.cliente.dragDropEnabled ?? true) && (
+                <div className="flex items-center space-x-2 text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                  <Move className="h-3 w-3" />
+                  <span>Arrastrar deshabilitado</span>
+                </div>
+              )}
+            </div>
+            </div>
+
+            {/* Vista Móvil */}
+            <div className="block md:hidden">
+              {!selectedDayMobile ? (
+                // Vista de calendario compacto
+                <div className="p-4">
+                  {/* Calcular días del mes para móvil */}
+                  {(() => {
+                    const año = fechaCalendario.getFullYear();
+                    const mes = fechaCalendario.getMonth();
+                    const primerDia = new Date(año, mes, 1);
+                    const ultimoDia = new Date(año, mes + 1, 0);
+                    
+                    // Día de la semana del primer día (0 = domingo, 1 = lunes, etc.)
+                    let primerDiaMes = primerDia.getDay();
+                    // Convertir para que lunes sea 0
+                    primerDiaMes = primerDiaMes === 0 ? 6 : primerDiaMes - 1;
+                    
+                    const diasEnMes = ultimoDia.getDate();
+                    
+                    return (
+                      <>
+                        {/* Header del Calendario Móvil */}
+                        <div className="flex items-center justify-between mb-4">
+                          <button
+                            onClick={() => {
+                              const nuevaFecha = new Date(fechaCalendario);
+                              nuevaFecha.setMonth(nuevaFecha.getMonth() - 1);
+                              setFechaCalendario(nuevaFecha);
+                            }}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                          >
+                            <ChevronLeft className="h-5 w-5" />
+                          </button>
+                          
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {fechaCalendario.toLocaleDateString('es-ES', { 
+                              month: 'long', 
+                              year: 'numeric' 
+                            })}
+                          </h3>
+                          
+                          <button
+                            onClick={() => {
+                              const nuevaFecha = new Date(fechaCalendario);
+                              nuevaFecha.setMonth(nuevaFecha.getMonth() + 1);
+                              setFechaCalendario(nuevaFecha);
+                            }}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                          >
+                            <ChevronRight className="h-5 w-5" />
+                          </button>
+                        </div>
+
+                        {/* Días de la semana */}
+                        <div className="grid grid-cols-7 gap-1 mb-2">
+                          {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((dia, index) => (
+                            <div key={index} className="text-center text-xs font-medium text-gray-500 py-2">
+                              {dia}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Grid del calendario móvil */}
+                        <div className="grid grid-cols-7 gap-1">
+                          {Array.from({ length: primerDiaMes }, (_, i) => (
+                            <div key={`empty-${i}`} className="aspect-square"></div>
+                          ))}
+                          
+                          {Array.from({ length: diasEnMes }, (_, i) => {
+                            const dia = i + 1;
+                            const fechaDia = new Date(fechaCalendario.getFullYear(), fechaCalendario.getMonth(), dia);
+                            const puntitos = obtenerPuntitosPorDia(fechaDia);
+                            const esHoy = fechaDia.toDateString() === new Date().toDateString();
+                            
+                            return (
+                              <button
+                                key={dia}
+                                onClick={() => setSelectedDayMobile(fechaDia)}
+                                className={`
+                                  aspect-square flex flex-col items-center justify-center p-1 rounded-lg transition-colors
+                                  hover:bg-blue-50 relative
+                                  ${esHoy ? 'bg-blue-100 text-blue-600 font-bold' : 'text-gray-700'}
+                                `}
+                              >
+                                <span className="text-sm mb-1">{dia}</span>
+                                {puntitos.length > 0 && (
+                                  <div className="flex space-x-0.5">
+                                    {puntitos.map((puntito, index) => (
+                                      <span key={index} className="text-xs leading-none">
+                                        {puntito}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Leyenda móvil */}
+                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                          <div className="flex justify-center space-x-4 text-xs">
+                            <div className="flex items-center space-x-1">
+                              <span>🟡</span>
+                              <span className="text-gray-600">Por revisar</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <span>🟠</span>
+                              <span className="text-gray-600">Cambios</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <span>🟢</span>
+                              <span className="text-gray-600">Aprobadas</span>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                // Vista expandida del día seleccionado
+                <div className="p-4">
+                  {/* Header del día seleccionado */}
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {selectedDayMobile.toLocaleDateString('es-ES', { 
+                          weekday: 'long', 
+                          day: 'numeric', 
+                          month: 'long' 
+                        })}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setSelectedDayMobile(null)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  {/* Publicaciones del día */}
+                  {(() => {
+                    const publicacionesDelDia = obtenerPublicacionesPorFecha(selectedDayMobile);
+                    
+                    if (publicacionesDelDia.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-gray-500">
+                          <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                          <p>No hay publicaciones programadas para este día</p>
+                        </div>
+                      );
+                    }
+
+                    // Agrupar por estado
+                    const porRevisar = publicacionesDelDia.filter(pub => 
+                      data?.publicacionesPorRevisar?.some(p => p.id === pub.id)
+                    );
+                    const pendientesCambios = publicacionesDelDia.filter(pub => 
+                      data?.publicacionesPendientesCambios?.some(p => p.id === pub.id)
+                    );
+                    const aprobadas = publicacionesDelDia.filter(pub => 
+                      data?.publicacionesAprobadas?.some(p => p.id === pub.id)
+                    );
+
+                    return (
+                      <div className="space-y-4">
+                        {/* Por revisar */}
+                        {porRevisar.length > 0 && (
+                          <div>
+                            <div className="flex items-center space-x-2 mb-3">
+                              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                              <h4 className="font-medium text-gray-900">Por revisar ({porRevisar.length})</h4>
+                            </div>
+                            <div className="space-y-2">
+                              {porRevisar.map(pub => renderPublicacionCardMobile(pub))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Pendientes cambios */}
+                        {pendientesCambios.length > 0 && (
+                          <div>
+                            <div className="flex items-center space-x-2 mb-3">
+                              <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                              <h4 className="font-medium text-gray-900">Pendientes cambios ({pendientesCambios.length})</h4>
+                            </div>
+                            <div className="space-y-2">
+                              {pendientesCambios.map(pub => renderPublicacionCardMobile(pub))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Aprobadas */}
+                        {aprobadas.length > 0 && (
+                          <div>
+                            <div className="flex items-center space-x-2 mb-3">
+                              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                              <h4 className="font-medium text-gray-900">Aprobadas ({aprobadas.length})</h4>
+                            </div>
+                            <div className="space-y-2">
+                              {aprobadas.map(pub => renderPublicacionCardMobile(pub))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           </div>
-        ) : vistaActiva === 'kanban' ? (
-          // Vista Kanban
+        ) : (
+          // Vista Kanban (por defecto)
           <div className="w-full">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 relative">
               {/* Separador vertical derecho */}
@@ -1781,141 +2090,6 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
               </div>
             </div>
           </div>
-        ) : (
-          <div className="space-y-12">
-            {/* Sección: Por revisar */}
-            {(() => {
-              const publicacionesFiltradas = aplicarFiltros(data.publicacionesPorRevisar || []);
-              return publicacionesFiltradas.length > 0 && (
-                <section>
-                  <div className="flex items-center mb-6">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                      <h2 className="text-2xl font-bold text-gray-900">
-                        Por revisar ({publicacionesFiltradas.length})
-                      </h2>
-                      {hayFiltrosActivos() && (
-                        <Badge variant="outline" className="text-xs">
-                          de {data.total?.porRevisar || 0} total
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {publicacionesFiltradas.map((publicacion) => (
-                      <Card key={publicacion.id} className="group hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-300 border-0 bg-white/70 backdrop-blur-sm shadow-lg overflow-hidden hover:-translate-y-1 border-l-4 border-l-amber-400">
-                        {renderPublicacionCard(publicacion, true)}
-                      </Card>
-                    ))}
-                  </div>
-                </section>
-              );
-            })()}
-
-            {/* Sección: Pendientes de cambios */}
-            {(() => {
-              const publicacionesFiltradas = aplicarFiltros(data.publicacionesPendientesCambios || []);
-              return publicacionesFiltradas.length > 0 && (
-                <section>
-                  <div className="flex items-center mb-6">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                      <h2 className="text-2xl font-bold text-gray-900">
-                        Pendientes de cambios ({publicacionesFiltradas.length})
-                      </h2>
-                      {hayFiltrosActivos() && (
-                        <Badge variant="outline" className="text-xs">
-                          de {data.total?.pendientesCambios || 0} total
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {publicacionesFiltradas.map((publicacion) => (
-                                              <Card key={publicacion.id} className="group hover:shadow-2xl hover:shadow-orange-500/10 transition-all duration-300 border-0 bg-white/70 backdrop-blur-sm shadow-lg overflow-hidden hover:-translate-y-1 border-l-4 border-l-orange-400">
-                        {renderPublicacionCard(publicacion, false)}
-                      </Card>
-                    ))}
-                  </div>
-                </section>
-              );
-            })()}
-
-            {/* Sección: Aprobadas */}
-            {(() => {
-              const publicacionesFiltradas = aplicarFiltros(data.publicacionesAprobadas || []);
-              return publicacionesFiltradas.length > 0 && (
-                <section>
-                  <div className="flex items-center mb-6">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <h2 className="text-2xl font-bold text-gray-900">
-                        Aprobadas ({publicacionesFiltradas.length})
-                      </h2>
-                      {hayFiltrosActivos() && (
-                        <Badge variant="outline" className="text-xs">
-                          de {data.total?.aprobadas || 0} total
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {publicacionesFiltradas.map((publicacion) => (
-                                              <Card key={publicacion.id} className="group hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300 border-0 bg-white/70 backdrop-blur-sm shadow-lg overflow-hidden hover:-translate-y-1 border-l-4 border-l-emerald-400">
-                        {renderPublicacionCard(publicacion, false)}
-                      </Card>
-                    ))}
-                  </div>
-                </section>
-              );
-            })()}
-
-            {/* Mensaje si no hay resultados con filtros */}
-            {(() => {
-              const publicacionesPorRevisarFiltradas = aplicarFiltros(data.publicacionesPorRevisar || []);
-              const publicacionesPendientesFiltradas = aplicarFiltros(data.publicacionesPendientesCambios || []);
-              const publicacionesAprobadasFiltradas = aplicarFiltros(data.publicacionesAprobadas || []);
-              
-              const hayResultados = publicacionesPorRevisarFiltradas.length > 0 || 
-                                   publicacionesPendientesFiltradas.length > 0 || 
-                                   publicacionesAprobadasFiltradas.length > 0;
-              
-              const hayPublicacionesTotales = (data.total?.total || 0) > 0;
-              
-              if (!hayResultados && hayPublicacionesTotales && hayFiltrosActivos()) {
-                return (
-                  <div className="text-center py-12">
-                    <div className="text-gray-500 text-6xl mb-4">🔍</div>
-                    <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-                      Sin resultados
-                    </h2>
-                    <p className="text-gray-600 mb-4">
-                      No se encontraron publicaciones que coincidan con los filtros aplicados.
-                    </p>
-                    <Button variant="outline" onClick={limpiarFiltros}>
-                      Limpiar filtros
-                    </Button>
-                  </div>
-                );
-              }
-              
-              if (!hayResultados && hayPublicacionesTotales && !hayFiltrosActivos()) {
-                return (
-                  <div className="text-center py-12">
-                    <div className="text-gray-500 text-6xl mb-4">🔍</div>
-                    <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-                      Sin coincidencias
-                    </h2>
-                    <p className="text-gray-600">
-                      Hay publicaciones, pero ninguna coincide con los estados configurados.
-                    </p>
-                  </div>
-                );
-              }
-              
-              return null;
-            })()}
-          </div>
         )}
       </div>
 
@@ -1948,193 +2122,10 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
       )}
 
       {/* Modal Wiki */}
-      <Dialog open={showWikiModal} onOpenChange={setShowWikiModal}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden bg-white border-0 shadow-2xl rounded-xl">
-          <DialogHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 -m-6 mb-6 rounded-t-xl">
-            <DialogTitle className="flex items-center space-x-3 text-xl font-bold">
-              <div className="bg-white/20 p-2 rounded-lg">
-                <HelpCircle className="h-6 w-6" />
-              </div>
-              <span>Guía de Uso - Portal de Revisión</span>
-            </DialogTitle>
-            <DialogDescription className="text-blue-100 mt-2 text-base">
-              Aprende a usar todas las funciones del portal de manera rápida y eficiente
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="overflow-y-auto max-h-[60vh] px-1">
-            <div className="space-y-8">
-              {/* Vista General */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border-l-4 border-blue-500">
-                <h3 className="text-xl font-bold text-gray-900 mb-3 flex items-center">
-                  <span className="text-2xl mr-3">🎯</span>
-                  ¿Qué es esto?
-                </h3>
-                <p className="text-gray-700 text-base leading-relaxed">
-                  Este portal te permite revisar y aprobar las publicaciones de redes sociales antes de que se publiquen.
-                </p>
-              </div>
-
-              {/* Estados de Publicaciones */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                  <span className="text-2xl mr-3">📊</span>
-                  Estados de las Publicaciones
-                </h3>
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                    <div className="bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-semibold min-w-fit">Por Revisar</div>
-                    <span className="text-gray-700 font-medium">Publicaciones nuevas que necesitan tu aprobación</span>
-                  </div>
-                  <div className="flex items-start space-x-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
-                    <div className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-semibold min-w-fit">Pendientes</div>
-                    <span className="text-gray-700 font-medium">Publicaciones que solicitaste modificar</span>
-                  </div>
-                  <div className="flex items-start space-x-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                    <div className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-semibold min-w-fit">Aprobadas</div>
-                    <span className="text-gray-700 font-medium">Publicaciones listas para publicar</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Acciones Principales */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                  <span className="text-2xl mr-3">⚡</span>
-                  Acciones Rápidas
-                </h3>
-                <div className="grid gap-4">
-                  <div className="flex items-start space-x-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                    <div className="bg-green-500 p-2 rounded-lg">
-                      <CheckCircle className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <span className="font-bold text-gray-900 text-base">Aprobar</span>
-                      <p className="text-gray-700 mt-1">La publicación está perfecta y puede publicarse</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
-                    <div className="bg-orange-500 p-2 rounded-lg">
-                      <X className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <span className="font-bold text-gray-900 text-base">Solicitar Cambios</span>
-                      <p className="text-gray-700 mt-1">Indica qué necesita modificarse</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="bg-blue-500 p-2 rounded-lg">
-                      <MessageCircle className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <span className="font-bold text-gray-900 text-base">Comentar</span>
-                      <p className="text-gray-700 mt-1">Agregar comentarios sin cambiar el estado</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tipos de Vista */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                  <span className="text-2xl mr-3">👁️</span>
-                  Tipos de Vista
-                </h3>
-                <div className="grid gap-3">
-                  <div className="flex items-center space-x-4 p-3 bg-blue-50 rounded-lg">
-                    <div className="bg-blue-500 p-2 rounded-lg">
-                      <Columns className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <span className="font-bold text-gray-900">Kanban</span>
-                      <span className="text-gray-700 ml-2">Tarjetas organizadas por estado (recomendado)</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
-                    <div className="bg-gray-500 p-2 rounded-lg">
-                      <List className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <span className="font-bold text-gray-900">Lista</span>
-                      <span className="text-gray-700 ml-2">Vista tradicional en lista</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4 p-3 bg-purple-50 rounded-lg">
-                    <div className="bg-purple-500 p-2 rounded-lg">
-                      <Calendar className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <span className="font-bold text-gray-900">Calendario</span>
-                      <span className="text-gray-700 ml-2">Ve las publicaciones organizadas por fecha</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Filtros */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                  <span className="text-2xl mr-3">🔍</span>
-                  Filtros Útiles
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <span className="font-bold text-gray-900">Por mes</span>
-                    <p className="text-gray-700 text-sm mt-1">Filtra publicaciones de un mes específico</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <span className="font-bold text-gray-900">Por plataforma</span>
-                    <p className="text-gray-700 text-sm mt-1">Instagram, Facebook, TikTok, etc.</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <span className="font-bold text-gray-900">Por tipo</span>
-                    <p className="text-gray-700 text-sm mt-1">Post, Story, Reel, etc.</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <span className="font-bold text-gray-900">Búsqueda</span>
-                    <p className="text-gray-700 text-sm mt-1">Busca por texto en el título</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Consejos */}
-              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 p-6 rounded-xl border-l-4 border-emerald-500">
-                <h3 className="text-xl font-bold text-emerald-900 mb-4 flex items-center">
-                  <span className="text-2xl mr-3">💡</span>
-                  Consejos Rápidos
-                </h3>
-                <div className="grid gap-3">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full mt-2"></div>
-                    <p className="text-emerald-800 font-medium">Usa el botón "Actualizar" si no ves cambios recientes</p>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full mt-2"></div>
-                    <p className="text-emerald-800 font-medium">En vista calendario, arrastra publicaciones para cambiar fechas</p>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full mt-2"></div>
-                    <p className="text-emerald-800 font-medium">Los comentarios se sincronizan automáticamente con el equipo</p>
-                  </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full mt-2"></div>
-                    <p className="text-emerald-800 font-medium">Las publicaciones aprobadas se procesan automáticamente</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="bg-gray-50 p-6 -m-6 mt-6 rounded-b-xl border-t">
-            <Button 
-              onClick={() => setShowWikiModal(false)}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold px-8 py-2 rounded-lg shadow-lg transition-all duration-200"
-            >
-              ¡Entendido!
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <WikiModal
+        isOpen={showWikiModal}
+        onClose={() => setShowWikiModal(false)}
+      />
     </div>
   );
 }

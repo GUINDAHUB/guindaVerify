@@ -358,6 +358,7 @@ export async function createClientUser(
   nombre: string,
   username: string,
   password: string,
+  email?: string,
   esAdminCliente = false
 ): Promise<{ success: boolean; user?: any; error?: string }> {
   try {
@@ -381,6 +382,7 @@ export async function createClientUser(
       nombre,
       username,
       password_hash: hashedPassword,
+      email: email || null,
       es_admin_cliente: esAdminCliente,
       activo: true
     };
@@ -439,11 +441,40 @@ export async function updateClientUserPassword(
   }
 }
 
+export async function updateClientUser(
+  userId: string,
+  nombre: string,
+  email?: string
+): Promise<boolean> {
+  try {
+    const updateData: any = {
+      nombre,
+      email: email || null,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('usuarios_clientes')
+      .update(updateData)
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Error al actualizar usuario:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error en actualización de usuario:', error);
+    return false;
+  }
+}
+
 export async function getClientUsers(clienteId: string): Promise<any[]> {
   try {
     const { data, error } = await supabase
       .from('usuarios_clientes')
-      .select('id, nombre, username, es_admin_cliente, activo, created_at')
+      .select('id, nombre, username, email, es_admin_cliente, activo, created_at')
       .eq('cliente_id', clienteId)
       .order('created_at', { ascending: true });
 

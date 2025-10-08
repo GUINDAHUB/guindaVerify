@@ -260,6 +260,10 @@ export class SupabaseService {
   }
 
   // Configuración del sistema
+  async getConfiguracion(): Promise<any> {
+    return this.getConfiguracionSistema();
+  }
+
   async getConfiguracionSistema(): Promise<any> {
     try {
       const { data, error } = await supabase
@@ -281,6 +285,15 @@ export class SupabaseService {
           clickupApiKey: data.clickup_api_key,
           clickupWorkspaceId: data.clickup_workspace_id,
           estadosPorDefecto: data.estados_por_defecto,
+          // Configuración SMTP
+          smtpHost: data.smtp_host,
+          smtpPort: data.smtp_port,
+          smtpSecure: data.smtp_secure,
+          smtpUser: data.smtp_user,
+          smtpPass: data.smtp_pass,
+          smtpFromName: data.smtp_from_name,
+          smtpFromEmail: data.smtp_from_email,
+          smtpEnabled: data.smtp_enabled,
           createdAt: data.created_at,
           updatedAt: data.updated_at
         };
@@ -329,6 +342,15 @@ export class SupabaseService {
           aprobado: 'Aprobado',
           rechazado: 'Rechazado'
         },
+        // Configuración SMTP
+        smtp_host: config.smtpHost || null,
+        smtp_port: config.smtpPort || null,
+        smtp_secure: config.smtpSecure || null,
+        smtp_user: config.smtpUser || null,
+        smtp_pass: config.smtpPass || null,
+        smtp_from_name: config.smtpFromName || null,
+        smtp_from_email: config.smtpFromEmail || null,
+        smtp_enabled: config.smtpEnabled || null,
         updated_at: new Date().toISOString()
       };
 

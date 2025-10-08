@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClickUpService } from '@/lib/clickup';
 import { getSupabaseService } from '@/lib/supabase';
+import { getNotificationService } from '@/lib/notifications';
 
 export async function GET(
   request: NextRequest,
@@ -79,6 +80,15 @@ export async function GET(
     console.log(`- Por revisar: ${publicacionesPorRevisar.length}`);
     console.log(`- Pendientes cambios: ${publicacionesPendientesCambios.length}`);
     console.log(`- Aprobadas: ${publicacionesAprobadas.length}`);
+
+    // 🔔 Detectar nuevas publicaciones para notificaciones
+    try {
+      const notificationService = getNotificationService();
+      await notificationService.detectNewPublications(cliente.id, publicacionesPorRevisar);
+    } catch (error) {
+      console.error('⚠️ Error detectando nuevas publicaciones para notificaciones:', error);
+      // No fallar la respuesta principal por un error de notificaciones
+    }
 
     return NextResponse.json({
       cliente: {

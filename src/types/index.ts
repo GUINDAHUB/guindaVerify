@@ -207,4 +207,13 @@ export interface ConfiguracionSistema {
     aprobado: string;
     rechazado: string;
   };
+  // Configuración SMTP
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpSecure?: boolean;
+  smtpUser?: string;
+  smtpPass?: string;
+  smtpFromName?: string;
+  smtpFromEmail?: string;
+  smtpEnabled?: boolean;
 } 

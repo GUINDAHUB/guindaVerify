@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdminAuthenticated, getClientUsers, createClientUser } from '@/lib/auth';
+import { isAdminAuthenticated, getClientUsers, createClientUser, updateClientUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 export async function GET(
@@ -53,7 +53,7 @@ export async function POST(
     const requestBody = await request.json();
     console.log('Request body:', requestBody);
     
-    const { nombre, username, password, esAdminCliente } = requestBody;
+    const { nombre, username, password, email, esAdminCliente } = requestBody;
 
     // Validaciones
     if (!nombre || !password) {
@@ -79,8 +79,8 @@ export async function POST(
     }
 
     // Crear usuario
-    console.log('Calling createClientUser with:', { id, nombre, finalUsername, password: '[HIDDEN]', esAdminCliente });
-    const result = await createClientUser(id, nombre, finalUsername, password, esAdminCliente || false);
+    console.log('Calling createClientUser with:', { id, nombre, finalUsername, password: '[HIDDEN]', email, esAdminCliente });
+    const result = await createClientUser(id, nombre, finalUsername, password, email, esAdminCliente || false);
     console.log('createClientUser result:', result);
 
     if (!result.success) {
@@ -100,6 +100,78 @@ export async function POST(
     console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack available');
     return NextResponse.json(
       { error: 'Error interno del servidor', details: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    console.log('=== PUT /api/admin/clientes/[id]/usuarios ===');
+    
+    // Verificar autenticación de administrador
+    const isAuth = await isAdminAuthenticated();
+    console.log('Admin authenticated:', isAuth);
+    
+    if (!isAuth) {
+      console.log('Authentication failed');
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'ID de usuario es requerido' },
+        { status: 400 }
+      );
+    }
+
+    console.log('Cliente ID:', id);
+    console.log('Usuario ID:', userId);
+    
+    const requestBody = await request.json();
+    console.log('Request body:', requestBody);
+    
+    const { nombre, email } = requestBody;
+
+    // Validaciones
+    if (!nombre) {
+      return NextResponse.json(
+        { error: 'Nombre es requerido' },
+        { status: 400 }
+      );
+    }
+
+    // Actualizar usuario
+    console.log('Calling updateClientUser with:', { userId, nombre, email });
+    const result = await updateClientUser(userId, nombre, email);
+    console.log('updateClientUser result:', result);
+
+    if (!result) {
+      return NextResponse.json(
+        { error: 'Error al actualizar usuario' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Usuario actualizado correctamente'
+    });
+
+  } catch (error) {
+    console.error('Error actualizando usuario cliente:', error);
+    return NextResponse.json(
+      { error: 'Error interno del servidor' },
       { status: 500 }
     );
   }

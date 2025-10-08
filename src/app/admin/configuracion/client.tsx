@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Save, CheckCircle, AlertCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ArrowLeft, Save, CheckCircle, AlertCircle, Mail } from "lucide-react";
 import { toast } from "sonner";
 import AdminLayout from '@/components/admin-layout';
 
@@ -20,13 +21,26 @@ export function ConfiguracionPageClient() {
       pendienteRevision: 'Pendiente de Revisión',
       aprobado: 'Aprobado',
       rechazado: 'Rechazado'
-    }
+    },
+    // Configuración SMTP
+    smtpHost: '',
+    smtpPort: 587,
+    smtpSecure: false,
+    smtpUser: '',
+    smtpPass: '',
+    smtpFromName: 'GuindaVerify',
+    smtpFromEmail: '',
+    smtpEnabled: false
   });
 
   const [status, setStatus] = useState({
     supabase: false,
-    clickup: false
+    clickup: false,
+    email: false
   });
+
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
 
   useEffect(() => {
     loadConfig();
@@ -38,7 +52,27 @@ export function ConfiguracionPageClient() {
       const response = await fetch('/api/admin/configuracion');
       if (response.ok) {
         const data = await response.json();
-        setConfig(data.config || config);
+        const loadedConfig = data.config || {};
+        
+        // Asegurar que todos los campos tengan valores definidos
+        setConfig({
+          clickupApiKey: loadedConfig.clickupApiKey || '',
+          clickupWorkspaceId: loadedConfig.clickupWorkspaceId || '',
+          estadosPorDefecto: loadedConfig.estadosPorDefecto || {
+            pendienteRevision: 'Pendiente de Revisión',
+            aprobado: 'Aprobado',
+            rechazado: 'Rechazado'
+          },
+          // Configuración SMTP con valores por defecto
+          smtpHost: loadedConfig.smtpHost || '',
+          smtpPort: loadedConfig.smtpPort || 587,
+          smtpSecure: loadedConfig.smtpSecure || false,
+          smtpUser: loadedConfig.smtpUser || '',
+          smtpPass: loadedConfig.smtpPass || '',
+          smtpFromName: loadedConfig.smtpFromName || 'GuindaVerify',
+          smtpFromEmail: loadedConfig.smtpFromEmail || '',
+          smtpEnabled: loadedConfig.smtpEnabled || false
+        });
       }
     } catch (error) {
       console.error('Error cargando configuración:', error);
@@ -59,7 +93,8 @@ export function ConfiguracionPageClient() {
 
       setStatus({
         supabase: supabaseStatus,
-        clickup: clickupStatus
+        clickup: clickupStatus,
+        email: false
       });
     } catch (error) {
       console.error('Error verificando estado:', error);
@@ -109,6 +144,39 @@ export function ConfiguracionPageClient() {
       }
     } catch (error) {
       toast.error('Error de conexión');
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!testEmail) {
+      toast.error('Por favor ingresa un email para la prueba');
+      return;
+    }
+
+    setTestingEmail(true);
+    try {
+      const response = await fetch('/api/admin/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: testEmail }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success('Email de prueba enviado exitosamente', {
+          description: `Revisa la bandeja de entrada de ${testEmail}`
+        });
+        setStatus(prev => ({ ...prev, email: true }));
+      } else {
+        toast.error(data.error || 'Error enviando email de prueba');
+        setStatus(prev => ({ ...prev, email: false }));
+      }
+    } catch (error) {
+      toast.error('Error de conexión');
+      setStatus(prev => ({ ...prev, email: false }));
+    } finally {
+      setTestingEmail(false);
     }
   };
 
@@ -193,6 +261,74 @@ export function ConfiguracionPageClient() {
               >
                 Probar Conexión
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Estado de Email</CardTitle>
+                <Badge variant={config.smtpEnabled && status.email ? "default" : "secondary"}>
+                  {config.smtpEnabled ? (status.email ? "Configurado" : "Sin probar") : "Deshabilitado"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center space-x-2">
+                {config.smtpEnabled ? (
+                  status.email ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 text-yellow-600" />
+                  )
+                ) : (
+                  <AlertCircle className="h-5 w-5 text-gray-400" />
+                )}
+                <span className="text-sm text-gray-600">
+                  {config.smtpEnabled 
+                    ? (status.email ? "SMTP configurado y funcionando" : "SMTP configurado, sin probar")
+                    : "Notificaciones por email deshabilitadas"
+                  }
+                </span>
+              </div>
+              {config.smtpEnabled && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="email@ejemplo.com"
+                      value={testEmail}
+                      onChange={(e) => setTestEmail(e.target.value)}
+                      className="flex-1"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && testEmail && !testingEmail) {
+                          handleTestEmail();
+                        }
+                      }}
+                    />
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={handleTestEmail}
+                      disabled={testingEmail || !testEmail}
+                    >
+                      {testingEmail ? (
+                        <>
+                          <div className="loading-spinner w-3 h-3 mr-1"></div>
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-3 h-3 mr-1" />
+                          Probar
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Envía un email de prueba para verificar la configuración SMTP
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -313,6 +449,182 @@ export function ConfiguracionPageClient() {
           </CardContent>
         </Card>
 
+        {/* SMTP Configuration Form */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Mail className="h-5 w-5" />
+              <span>Configuración de Email (SMTP)</span>
+            </CardTitle>
+            <CardDescription>
+              Configura el servidor SMTP para enviar notificaciones por email a los clientes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Habilitar/Deshabilitar SMTP */}
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1">
+                  <Label htmlFor="smtpEnabled" className="text-base font-medium">
+                    Habilitar notificaciones por email
+                  </Label>
+                  <p className="text-sm text-gray-500">
+                    Activa el envío automático de notificaciones por email
+                  </p>
+                </div>
+                <Switch
+                  id="smtpEnabled"
+                  checked={config.smtpEnabled}
+                  onCheckedChange={(checked) => setConfig({...config, smtpEnabled: checked})}
+                />
+              </div>
+
+              {config.smtpEnabled && (
+                <div className="space-y-6 border-t pt-6">
+                  {/* Configuración del servidor */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="smtpHost">Servidor SMTP *</Label>
+                      <Input
+                        id="smtpHost"
+                        value={config.smtpHost}
+                        onChange={(e) => setConfig({...config, smtpHost: e.target.value})}
+                        placeholder="smtp.gmail.com"
+                        required={config.smtpEnabled}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Ej: smtp.gmail.com, smtp.outlook.com, mail.tudominio.com
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpPort">Puerto SMTP *</Label>
+                      <Input
+                        id="smtpPort"
+                        type="number"
+                        value={config.smtpPort.toString()}
+                        onChange={(e) => setConfig({...config, smtpPort: parseInt(e.target.value) || 587})}
+                        placeholder="587"
+                        required={config.smtpEnabled}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        587 (TLS) o 465 (SSL)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Seguridad */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="space-y-1">
+                      <Label htmlFor="smtpSecure" className="text-sm font-medium">
+                        Usar SSL (puerto 465)
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        Desactivar para TLS (puerto 587)
+                      </p>
+                    </div>
+                    <Switch
+                      id="smtpSecure"
+                      checked={config.smtpSecure}
+                      onCheckedChange={(checked) => {
+                        setConfig({
+                          ...config, 
+                          smtpSecure: checked,
+                          smtpPort: checked ? 465 : 587
+                        });
+                      }}
+                    />
+                  </div>
+
+                  {/* Credenciales */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="smtpUser">Usuario SMTP *</Label>
+                      <Input
+                        id="smtpUser"
+                        type="email"
+                        value={config.smtpUser}
+                        onChange={(e) => setConfig({...config, smtpUser: e.target.value})}
+                        placeholder="tu-email@gmail.com"
+                        required={config.smtpEnabled}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Tu email completo
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpPass">Contraseña SMTP *</Label>
+                      <Input
+                        id="smtpPass"
+                        type="password"
+                        value={config.smtpPass}
+                        onChange={(e) => setConfig({...config, smtpPass: e.target.value})}
+                        placeholder="••••••••••••••••"
+                        required={config.smtpEnabled}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Para Gmail: usa una contraseña de aplicación
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Información del remitente */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="smtpFromName">Nombre del remitente</Label>
+                      <Input
+                        id="smtpFromName"
+                        value={config.smtpFromName}
+                        onChange={(e) => setConfig({...config, smtpFromName: e.target.value})}
+                        placeholder="GuindaVerify"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Nombre que aparecerá en los emails
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="smtpFromEmail">Email del remitente</Label>
+                      <Input
+                        id="smtpFromEmail"
+                        type="email"
+                        value={config.smtpFromEmail}
+                        onChange={(e) => setConfig({...config, smtpFromEmail: e.target.value})}
+                        placeholder="notificaciones@tudominio.com"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Si está vacío, usa el usuario SMTP
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+
+              <div className="flex justify-end">
+                <Button 
+                  type="submit" 
+                  disabled={saving}
+                  className="min-w-[120px]"
+                >
+                  {saving ? (
+                    <>
+                      <div className="loading-spinner w-4 h-4 mr-2"></div>
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Guardar Configuración
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
         {/* Instructions */}
         <Card className="mt-8">
           <CardHeader>
@@ -340,7 +652,47 @@ export function ConfiguracionPageClient() {
               </div>
 
               <div>
-                <h4 className="font-medium mb-2">3. Crear Clientes</h4>
+                <h4 className="font-medium mb-2">3. Configurar Email (Opcional)</h4>
+                <ul className="list-disc list-inside space-y-1 text-gray-600">
+                  <li>Habilita las notificaciones por email en la sección SMTP</li>
+                  <li>Para Gmail: usa una contraseña de aplicación (no tu contraseña normal)</li>
+                  <li>Para otros proveedores: usa las credenciales SMTP correspondientes</li>
+                  <li>Prueba la configuración enviando un email de prueba</li>
+                </ul>
+                
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                  <h5 className="font-medium text-blue-900 mb-2">📧 Configuraciones SMTP Comunes:</h5>
+                  <div className="grid md:grid-cols-2 gap-3 text-xs">
+                    <div className="bg-white p-3 rounded border">
+                      <strong className="text-blue-700">Gmail:</strong><br/>
+                      Host: smtp.gmail.com<br/>
+                      Puerto: 587 (TLS)<br/>
+                      Requiere: Contraseña de aplicación
+                    </div>
+                    <div className="bg-white p-3 rounded border">
+                      <strong className="text-purple-700">Outlook:</strong><br/>
+                      Host: smtp.live.com<br/>
+                      Puerto: 587 (TLS)<br/>
+                      Usuario: tu-email@outlook.com
+                    </div>
+                    <div className="bg-white p-3 rounded border">
+                      <strong className="text-green-700">Servidor Propio:</strong><br/>
+                      Host: mail.tudominio.com<br/>
+                      Puerto: 587 o 465<br/>
+                      Credenciales de hosting
+                    </div>
+                    <div className="bg-white p-3 rounded border">
+                      <strong className="text-orange-700">Yahoo:</strong><br/>
+                      Host: smtp.mail.yahoo.com<br/>
+                      Puerto: 587 (TLS)<br/>
+                      Requiere: Contraseña de aplicación
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">4. Crear Clientes</h4>
                 <ul className="list-disc list-inside space-y-1 text-gray-600">
                   <li>Una vez configurado, ve al Panel de Administración</li>
                   <li>Crea clientes asociándolos a listas específicas de ClickUp</li>

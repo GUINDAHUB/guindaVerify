@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit, Trash2, Users, Settings, Eye, RefreshCw, UserPlus, Move } from "lucide-react";
+import { Plus, Edit, Trash2, Users, Settings, Eye, RefreshCw, UserPlus, Move, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { Cliente } from '@/types';
 import AdminLayout from '@/components/admin-layout';
@@ -49,10 +49,19 @@ export function AdminPageClient() {
   const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
   const [newUserData, setNewUserData] = useState({
     nombre: '',
-    password: ''
+    password: '',
+    email: ''
   });
   const [passwordCheckStatus, setPasswordCheckStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+
+  // Estados para edición de usuario
+  const [editUserDialogOpen, setEditUserDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editUserData, setEditUserData] = useState({
+    nombre: '',
+    email: ''
+  });
 
   useEffect(() => {
     loadClientes();
@@ -369,6 +378,7 @@ export function AdminPageClient() {
       const requestData = {
         nombre: newUserData.nombre,
         password: newUserData.password,
+        email: newUserData.email || undefined,
         esAdminCliente: false
       };
 
@@ -382,7 +392,7 @@ export function AdminPageClient() {
         const data = await response.json();
         toast.success('Usuario creado correctamente');
         setNewUserDialogOpen(false);
-        setNewUserData({ nombre: '', password: '' });
+        setNewUserData({ nombre: '', password: '', email: '' });
         loadClientUsers(selectedClienteForUsers.id);
       } else {
         const responseText = await response.text();
@@ -395,6 +405,46 @@ export function AdminPageClient() {
         }
         
         toast.error(errorData.error || 'Error al crear usuario');
+      }
+    } catch (error) {
+      toast.error('Error de conexión');
+    }
+  };
+
+  const handleEditUser = (user: any) => {
+    setEditingUser(user);
+    setEditUserData({
+      nombre: user.nombre,
+      email: user.email || ''
+    });
+    setEditUserDialogOpen(true);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser || !editUserData.nombre) {
+      toast.error('El nombre es requerido');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/clientes/${selectedClienteForUsers?.id}/usuarios?userId=${editingUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: editUserData.nombre,
+          email: editUserData.email || undefined
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('Usuario actualizado correctamente');
+        setEditUserDialogOpen(false);
+        setEditingUser(null);
+        setEditUserData({ nombre: '', email: '' });
+        loadClientUsers(selectedClienteForUsers!.id);
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Error al actualizar usuario');
       }
     } catch (error) {
       toast.error('Error de conexión');
@@ -900,7 +950,7 @@ export function AdminPageClient() {
               <Button onClick={() => {
                 setNewUserDialogOpen(true);
                 setPasswordCheckStatus('idle');
-                setNewUserData({ nombre: '', password: '' });
+                setNewUserData({ nombre: '', password: '', email: '' });
                 if (debounceTimer) {
                   clearTimeout(debounceTimer);
                   setDebounceTimer(null);
@@ -918,6 +968,7 @@ export function AdminPageClient() {
                     <tr className="border-b">
                       <th className="text-left py-2 px-3">Nombre</th>
                       <th className="text-left py-2 px-3">Usuario</th>
+                      <th className="text-left py-2 px-3">Email</th>
                       <th className="text-left py-2 px-3">Estado</th>
                       <th className="text-left py-2 px-3">Creado</th>
                       <th className="text-left py-2 px-3">Acciones</th>
@@ -928,6 +979,13 @@ export function AdminPageClient() {
                       <tr key={user.id} className="border-b">
                         <td className="py-2 px-3">{user.nombre}</td>
                         <td className="py-2 px-3">{user.username}</td>
+                        <td className="py-2 px-3 text-sm">
+                          {user.email ? (
+                            <span className="text-gray-700">{user.email}</span>
+                          ) : (
+                            <span className="text-gray-400 italic">Sin email</span>
+                          )}
+                        </td>
                         <td className="py-2 px-3">
                           <Badge variant={user.activo ? "default" : "destructive"}>
                             {user.activo ? "Activo" : "Inactivo"}
@@ -937,14 +995,24 @@ export function AdminPageClient() {
                           {new Date(user.created_at).toLocaleDateString()}
                         </td>
                         <td className="py-2 px-3">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteUser(user.id, user.nombre)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditUser(user)}
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteUser(user.id, user.nombre)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -985,6 +1053,19 @@ export function AdminPageClient() {
               />
               <p className="text-xs text-gray-500 mt-1">
                 El nombre de usuario se generará automáticamente
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="newUserEmail">Email (opcional)</Label>
+              <Input
+                id="newUserEmail"
+                type="email"
+                value={newUserData.email}
+                onChange={(e) => setNewUserData({...newUserData, email: e.target.value})}
+                placeholder="usuario@ejemplo.com"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Para recibir notificaciones por email (opcional)
               </p>
             </div>
             <div>
@@ -1052,6 +1133,63 @@ export function AdminPageClient() {
               }
             >
               Crear Usuario
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para editar usuario */}
+      <Dialog open={editUserDialogOpen} onOpenChange={setEditUserDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Edit className="h-5 w-5" />
+              <span>Editar Usuario</span>
+            </DialogTitle>
+            <DialogDescription>
+              Modifica la información del usuario {editingUser?.username}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div>
+              <Label htmlFor="editUserNombre">Nombre</Label>
+              <Input
+                id="editUserNombre"
+                value={editUserData.nombre}
+                onChange={(e) => setEditUserData({...editUserData, nombre: e.target.value})}
+                placeholder="Ej: Juan Pérez"
+              />
+            </div>
+            <div>
+              <Label htmlFor="editUserEmail">Email (opcional)</Label>
+              <Input
+                id="editUserEmail"
+                type="email"
+                value={editUserData.email}
+                onChange={(e) => setEditUserData({...editUserData, email: e.target.value})}
+                placeholder="usuario@ejemplo.com"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Para recibir notificaciones por email (opcional)
+              </p>
+            </div>
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <Mail className="h-4 w-4 inline mr-1" />
+                <strong>Nota:</strong> El nombre de usuario y la contraseña no se pueden modificar. 
+                Si necesitas cambiar estos datos, crea un nuevo usuario.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setEditUserDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleUpdateUser}
+              disabled={!editUserData.nombre}
+            >
+              Guardar Cambios
             </Button>
           </div>
         </DialogContent>

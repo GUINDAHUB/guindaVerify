@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/admin/send-notifications",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/admin/check-review-publications",
+      "schedule": "*/15 * * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/admin/send-notifications/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/admin/check-review-publications/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

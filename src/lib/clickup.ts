@@ -175,32 +175,67 @@ export class ClickUpService {
     }
   }
 
-  // Actualizar la fecha límite (campo estándar de ClickUp)
+  // Actualizar la fecha de publicación (campo personalizado de ClickUp)
   async updateTaskDueDate(taskId: string, dueDate: number): Promise<void> {
     try {
-      console.log('🔍 Actualizando fecha límite de la tarea:', {
+      console.log('🔍 Actualizando fecha de publicación de la tarea:', {
         taskId,
         dueDate,
         fechaComprensible: new Date(dueDate).toISOString()
       });
 
-      // Actualizar la fecha límite usando la API estándar de ClickUp
-      const response = await axios.put(
-        `${CLICKUP_API_BASE}/task/${taskId}`,
-        { due_date: dueDate },
-        { headers: this.getHeaders() }
+      // Primero obtener la tarea para encontrar el campo personalizado "Fecha de publicacion"
+      const task = await this.getTask(taskId);
+      const campoFechaPublicacion = task.custom_fields.find(field => 
+        field.name === 'Fecha de publicacion' || 
+        field.name === 'Fecha de publicación' ||
+        field.name.toLowerCase() === 'fecha de publicacion' ||
+        field.name.toLowerCase() === 'fecha de publicación'
       );
 
-      console.log('✅ ClickUp API - Fecha límite actualizada:', {
-        status: response.status,
-        data: response.data,
-        taskId,
-        newDueDate: dueDate,
-        fechaComprensible: new Date(dueDate).toISOString()
-      });
+      if (campoFechaPublicacion) {
+        console.log('✅ Campo "Fecha de publicacion" encontrado, actualizando campo personalizado:', {
+          fieldId: campoFechaPublicacion.id,
+          fieldName: campoFechaPublicacion.name,
+          fieldType: campoFechaPublicacion.type
+        });
+
+        // Actualizar el campo personalizado usando la API de ClickUp
+        const response = await axios.put(
+          `${CLICKUP_API_BASE}/task/${taskId}/field/${campoFechaPublicacion.id}`,
+          { value: dueDate },
+          { headers: this.getHeaders() }
+        );
+
+        console.log('✅ ClickUp API - Campo personalizado actualizado:', {
+          status: response.status,
+          data: response.data,
+          taskId,
+          fieldId: campoFechaPublicacion.id,
+          newDueDate: dueDate,
+          fechaComprensible: new Date(dueDate).toISOString()
+        });
+      } else {
+        console.log('⚠️ Campo "Fecha de publicacion" no encontrado, usando due_date como fallback');
+        
+        // Fallback: actualizar la fecha límite usando la API estándar de ClickUp
+        const response = await axios.put(
+          `${CLICKUP_API_BASE}/task/${taskId}`,
+          { due_date: dueDate },
+          { headers: this.getHeaders() }
+        );
+
+        console.log('✅ ClickUp API - Fecha límite actualizada (fallback):', {
+          status: response.status,
+          data: response.data,
+          taskId,
+          newDueDate: dueDate,
+          fechaComprensible: new Date(dueDate).toISOString()
+        });
+      }
 
     } catch (error: any) {
-      console.error('❌ ClickUp API - Error actualizando fecha límite:', {
+      console.error('❌ ClickUp API - Error actualizando fecha de publicación:', {
         message: error.message,
         status: error.response?.status,
         statusText: error.response?.statusText,
@@ -208,7 +243,7 @@ export class ClickUpService {
         taskId,
         dueDate
       });
-      throw new Error(`No se pudo actualizar la fecha límite: ${error.message}`);
+      throw new Error(`No se pudo actualizar la fecha de publicación: ${error.message}`);
     }
   }
 
@@ -618,60 +653,77 @@ export class ClickUpService {
       date_updated: task.date_updated
     });
 
-    // Estrategia 1: Buscar campos tipo 'date'
-    const camposFechaTipo = task.custom_fields.filter(field => field.type === 'date');
-    console.log(`🎯 Campos tipo 'date' encontrados (${camposFechaTipo.length}):`, 
-      camposFechaTipo.map(f => ({ name: f.name, value: f.value, type_config: f.type_config }))
+    // Estrategia 1: Buscar específicamente el campo "Fecha de publicacion"
+    let campoFecha = task.custom_fields.find(field => 
+      field.name === 'Fecha de publicacion' || 
+      field.name === 'Fecha de publicación' ||
+      field.name === 'Fecha de publicacion' ||
+      field.name.toLowerCase() === 'fecha de publicacion' ||
+      field.name.toLowerCase() === 'fecha de publicación'
     );
 
-    // Estrategia 2: Buscar por nombre relacionado con fecha
-    const camposFechaNombre = task.custom_fields.filter(field => 
-      field.name.toLowerCase().includes('fecha') || 
-      field.name.toLowerCase().includes('programada') ||
-      field.name.toLowerCase().includes('publicación') ||
-      field.name.toLowerCase().includes('publicacion') ||
-      field.name.toLowerCase().includes('schedule') ||
-      field.name.toLowerCase().includes('publish') ||
-      field.name.toLowerCase().includes('date')
-    );
-    console.log(`📝 Campos por nombre relacionado (${camposFechaNombre.length}):`, 
-      camposFechaNombre.map(f => ({ name: f.name, value: f.value, type: f.type }))
-    );
+    if (campoFecha) {
+      console.log(`✅ Campo "Fecha de publicacion" encontrado:`, {
+        name: campoFecha.name,
+        type: campoFecha.type,
+        value: campoFecha.value
+      });
+    } else {
+      console.log(`❌ Campo "Fecha de publicacion" no encontrado, buscando alternativas...`);
+      
+      // Estrategia 2: Buscar campos tipo 'date' con nombres relacionados
+      const camposFechaTipo = task.custom_fields.filter(field => field.type === 'date');
+      console.log(`🎯 Campos tipo 'date' encontrados (${camposFechaTipo.length}):`, 
+        camposFechaTipo.map(f => ({ name: f.name, value: f.value, type_config: f.type_config }))
+      );
 
-    // Priorizar: 1) campos tipo date con nombre relacionado, 2) cualquier campo tipo date, 3) por nombre
-    let campoFecha = camposFechaTipo.find(field => 
-      field.name.toLowerCase().includes('fecha') || 
-      field.name.toLowerCase().includes('programada') ||
-      field.name.toLowerCase().includes('publicación') ||
-      field.name.toLowerCase().includes('publicacion') ||
-      field.name.toLowerCase().includes('schedule') ||
-      field.name.toLowerCase().includes('publish') ||
-      field.name.toLowerCase().includes('date')
-    );
+      // Estrategia 3: Buscar por nombre relacionado con fecha de publicación
+      const camposFechaNombre = task.custom_fields.filter(field => 
+        field.name.toLowerCase().includes('fecha') && 
+        (field.name.toLowerCase().includes('publicación') ||
+         field.name.toLowerCase().includes('publicacion') ||
+         field.name.toLowerCase().includes('programada') ||
+         field.name.toLowerCase().includes('schedule') ||
+         field.name.toLowerCase().includes('publish'))
+      );
+      console.log(`📝 Campos por nombre relacionado con publicación (${camposFechaNombre.length}):`, 
+        camposFechaNombre.map(f => ({ name: f.name, value: f.value, type: f.type }))
+      );
 
-    if (!campoFecha && camposFechaTipo.length > 0) {
-      campoFecha = camposFechaTipo[0];
-      console.log(`🔄 Usando primer campo tipo 'date' disponible:`, campoFecha.name);
-    }
+      // Priorizar: 1) campos tipo date con nombre relacionado, 2) cualquier campo tipo date
+      campoFecha = camposFechaTipo.find(field => 
+        field.name.toLowerCase().includes('fecha') && 
+        (field.name.toLowerCase().includes('publicación') ||
+         field.name.toLowerCase().includes('publicacion') ||
+         field.name.toLowerCase().includes('programada') ||
+         field.name.toLowerCase().includes('schedule') ||
+         field.name.toLowerCase().includes('publish'))
+      );
 
-    if (!campoFecha && camposFechaNombre.length > 0) {
-      campoFecha = camposFechaNombre[0];
-      console.log(`🔄 Usando primer campo por nombre relacionado:`, campoFecha.name);
+      if (!campoFecha && camposFechaTipo.length > 0) {
+        campoFecha = camposFechaTipo[0];
+        console.log(`🔄 Usando primer campo tipo 'date' disponible:`, campoFecha.name);
+      }
+
+      if (!campoFecha && camposFechaNombre.length > 0) {
+        campoFecha = camposFechaNombre[0];
+        console.log(`🔄 Usando primer campo por nombre relacionado:`, campoFecha.name);
+      }
     }
     
     let fechaRaw: string | undefined;
     let fuente = '';
     
-    // Priorizar el campo estándar due_date sobre los campos personalizados
-    if (task.due_date) {
-      fechaRaw = task.due_date;
-      fuente = 'due_date de la tarea (campo estándar)';
-      console.log(`✅ Fecha encontrada en ${fuente}:`, fechaRaw);
-    } else if (campoFecha && campoFecha.value !== null && campoFecha.value !== undefined) {
+    // Priorizar el campo personalizado "Fecha de publicacion" sobre due_date
+    if (campoFecha && campoFecha.value !== null && campoFecha.value !== undefined) {
       fechaRaw = campoFecha.value.toString();
-      fuente = `campo personalizado '${campoFecha.name}' (tipo: ${campoFecha.type}) - FALLBACK`;
-      console.log(`⚠️ Fecha encontrada en ${fuente}:`, { raw: fechaRaw, originalValue: campoFecha.value });
-      console.log(`💡 Recomendación: Migrar a usar el campo estándar 'fecha límite' de ClickUp`);
+      fuente = `campo personalizado '${campoFecha.name}' (tipo: ${campoFecha.type})`;
+      console.log(`✅ Fecha encontrada en ${fuente}:`, { raw: fechaRaw, originalValue: campoFecha.value });
+    } else if (task.due_date) {
+      fechaRaw = task.due_date;
+      fuente = 'due_date de la tarea (campo estándar) - FALLBACK';
+      console.log(`⚠️ Fecha encontrada en ${fuente}:`, fechaRaw);
+      console.log(`💡 Recomendación: Usar el campo personalizado 'Fecha de publicacion' en ClickUp`);
     } else {
       console.log(`❌ No se encontró fecha en ninguna fuente para tarea: ${task.name}`);
       console.log(`🔍 Due date:`, task.due_date);

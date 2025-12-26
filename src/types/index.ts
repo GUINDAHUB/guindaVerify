@@ -8,6 +8,7 @@ export interface Cliente {
   logoUrl?: string; // URL del logo del cliente
   clickupListId: string;
   estadosVisibles: string[]; // Estados que aparecen en el portal
+  clickupStatusNotStarted?: string; // Estado para publicaciones sin empezar
   estadosAprobacion: string[]; // Estados cuando aprueba
   estadosRechazo: string[]; // Estados cuando rechaza
   activo: boolean;

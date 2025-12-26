@@ -26,6 +26,7 @@ export function AdminPageClient() {
     logoUrl: '',
     clickupListId: '',
     estadosVisibles: '',
+    clickupStatusNotStarted: '',
     estadosAprobacion: '',
     estadosRechazo: '',
     dragDropEnabled: true
@@ -203,6 +204,7 @@ export function AdminPageClient() {
           clickupListId: selectedList || formData.clickupListId,
           estadosVisibles: selectedEstadosVisibles.length > 0 ? selectedEstadosVisibles : 
             (formData.estadosVisibles ? formData.estadosVisibles.split(',').map(s => s.trim()) : []),
+          clickupStatusNotStarted: formData.clickupStatusNotStarted,
           estadosAprobacion: selectedEstadosAprobacion.length > 0 ? selectedEstadosAprobacion : 
             (formData.estadosAprobacion ? formData.estadosAprobacion.split(',').map(s => s.trim()) : []),
           estadosRechazo: selectedEstadosRechazo.length > 0 ? selectedEstadosRechazo : 
@@ -252,6 +254,7 @@ export function AdminPageClient() {
       logoUrl: cliente.logoUrl || '',
       clickupListId: cliente.clickupListId,
       estadosVisibles: cliente.estadosVisibles.join(', '),
+      clickupStatusNotStarted: cliente.clickupStatusNotStarted || '',
       estadosAprobacion: cliente.estadosAprobacion.join(', '),
       estadosRechazo: cliente.estadosRechazo.join(', '),
       dragDropEnabled: cliente.dragDropEnabled ?? true,
@@ -280,6 +283,7 @@ export function AdminPageClient() {
       logoUrl: '',
       clickupListId: '',
       estadosVisibles: '',
+      clickupStatusNotStarted: '',
       estadosAprobacion: '',
       estadosRechazo: '',
       dragDropEnabled: true
@@ -682,6 +686,34 @@ export function AdminPageClient() {
                         Haz clic en el botón para cargar listas desde ClickUp
                       </p>
                     </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="clickupStatusNotStarted">Estado "Sin Empezar" (ClickUp)</Label>
+                    <Select 
+                      onValueChange={(val) => setFormData({...formData, clickupStatusNotStarted: val})} 
+                      value={formData.clickupStatusNotStarted}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona el estado inicial..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clickupStatuses.length > 0 ? (
+                          clickupStatuses.map((status) => (
+                            <SelectItem key={status.id} value={status.status}>
+                              {status.status}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-status" disabled>
+                            {selectedList ? 'No hay estados disponibles' : 'Selecciona una lista primero'}
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Estado previo a "Por Revisar". Aparecerá en el calendario y opcionalmente en Kanban.
+                    </p>
                   </div>
 
                   <div>

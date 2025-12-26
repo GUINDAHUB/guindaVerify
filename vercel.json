@@ -1,10 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/admin/check-review-publications",
-      "schedule": "0 9 * * *"
-    }
-  ],
   "functions": {
     "src/app/api/admin/check-review-publications/route.ts": {
       "maxDuration": 60

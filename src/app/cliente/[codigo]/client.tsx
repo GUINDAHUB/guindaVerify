@@ -23,14 +23,17 @@ interface ClienteData {
   codigo: string;
   logoUrl?: string;
   dragDropEnabled?: boolean;
+  clickupStatusNotStarted?: string;
 }
 
 interface PublicacionesResponse {
   cliente: ClienteData;
+  publicacionesSinEmpezar: TareaPublicacion[];
   publicacionesPorRevisar: TareaPublicacion[];
   publicacionesPendientesCambios: TareaPublicacion[];
   publicacionesAprobadas: TareaPublicacion[];
   total: {
+    sinEmpezar: number;
     porRevisar: number;
     pendientesCambios: number;
     aprobadas: number;
@@ -109,6 +112,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
   const [dragOverDay, setDragOverDay] = useState<string | null>(null);
   const [selectedPublicacion, setSelectedPublicacion] = useState<TareaPublicacion | null>(null);
   const [showWikiModal, setShowWikiModal] = useState(false);
+  const [showNotStarted, setShowNotStarted] = useState(false);
   const [selectedDayMobile, setSelectedDayMobile] = useState<Date | null>(null);
 
   const fetchPublicaciones = useCallback(async (isRefresh = false) => {
@@ -218,6 +222,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     const estadoLower = estado.toLowerCase();
     if (estadoLower.includes('pendiente')) return 'bg-yellow-100 text-yellow-800';
     if (estadoLower.includes('aprobado')) return 'bg-green-100 text-green-800';
+    if (estadoLower.includes('programado')) return 'bg-blue-100 text-blue-800';
     if (estadoLower.includes('rechazado')) return 'bg-red-100 text-red-800';
     return 'bg-gray-100 text-gray-800';
   };
@@ -255,6 +260,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
         setData(prev => prev ? {
           ...prev,
+          publicacionesSinEmpezar: prev.publicacionesSinEmpezar?.map(updateSpecificPublication) || [],
           publicacionesPorRevisar: prev.publicacionesPorRevisar?.map(updateSpecificPublication) || [],
           publicacionesPendientesCambios: prev.publicacionesPendientesCambios?.map(updateSpecificPublication) || [],
           publicacionesAprobadas: prev.publicacionesAprobadas?.map(updateSpecificPublication) || []
@@ -415,6 +421,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
   const getTiposPublicacion = (): string[] => {
     if (!data) return [];
     const todasPublicaciones = [
+      ...(data.publicacionesSinEmpezar || []),
       ...(data.publicacionesPorRevisar || []),
       ...(data.publicacionesPendientesCambios || []),
       ...(data.publicacionesAprobadas || [])
@@ -430,6 +437,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
   const getPlataformas = (): string[] => {
     if (!data) return [];
     const todasPublicaciones = [
+      ...(data.publicacionesSinEmpezar || []),
       ...(data.publicacionesPorRevisar || []),
       ...(data.publicacionesPendientesCambios || []),
       ...(data.publicacionesAprobadas || [])
@@ -445,6 +453,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     if (!data) return [];
     
     const todasPublicaciones = [
+      ...(data.publicacionesSinEmpezar || []),
       ...(data.publicacionesPorRevisar || []),
       ...(data.publicacionesPendientesCambios || []),
       ...(data.publicacionesAprobadas || [])
@@ -571,6 +580,10 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     const puntitos = [];
     
     // Contar por estado
+    const sinEmpezar = publicacionesDelDia.filter(pub => 
+      data?.publicacionesSinEmpezar?.some(p => p.id === pub.id)
+    ).length;
+
     const porRevisar = publicacionesDelDia.filter(pub => 
       data?.publicacionesPorRevisar?.some(p => p.id === pub.id)
     ).length;
@@ -584,6 +597,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     ).length;
 
     // Añadir puntitos por prioridad (máximo 3 puntitos visibles)
+    if (sinEmpezar > 0) puntitos.push('⚪');
     if (porRevisar > 0) puntitos.push('🟡');
     if (pendientesCambios > 0) puntitos.push('🟠');
     if (aprobadas > 0) puntitos.push('🟢');
@@ -595,6 +609,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
   const obtenerTodasPublicaciones = (): TareaPublicacion[] => {
     if (!data) return [];
     const todasPublicaciones = [
+      ...(data.publicacionesSinEmpezar || []),
       ...(data.publicacionesPorRevisar || []),
       ...(data.publicacionesPendientesCambios || []),
       ...(data.publicacionesAprobadas || [])
@@ -750,6 +765,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
         setData(prev => prev ? {
           ...prev,
+          publicacionesSinEmpezar: prev.publicacionesSinEmpezar?.map(updatePublication) || [],
           publicacionesPorRevisar: prev.publicacionesPorRevisar?.map(updatePublication) || [],
           publicacionesPendientesCambios: prev.publicacionesPendientesCambios?.map(updatePublication) || [],
           publicacionesAprobadas: prev.publicacionesAprobadas?.map(updatePublication) || []
@@ -779,6 +795,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
             setData(prev => prev ? {
               ...prev,
+              publicacionesSinEmpezar: prev.publicacionesSinEmpezar?.map(updateSpecificPublication) || [],
               publicacionesPorRevisar: prev.publicacionesPorRevisar?.map(updateSpecificPublication) || [],
               publicacionesPendientesCambios: prev.publicacionesPendientesCambios?.map(updateSpecificPublication) || [],
               publicacionesAprobadas: prev.publicacionesAprobadas?.map(updateSpecificPublication) || []
@@ -860,7 +877,11 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
             ? 'bg-gradient-to-br from-amber-100/80 to-yellow-100/80 border-amber-300/50 hover:bg-gradient-to-br hover:from-amber-200/80 hover:to-yellow-200/80 backdrop-blur-sm' 
             : publicacion.estado?.toLowerCase().includes('aprobado')
               ? 'bg-gradient-to-br from-emerald-100/80 to-green-100/80 border-emerald-300/50 hover:bg-gradient-to-br hover:from-emerald-200/80 hover:to-green-200/80 backdrop-blur-sm'
-              : 'bg-gradient-to-br from-orange-100/80 to-red-100/80 border-orange-300/50 hover:bg-gradient-to-br hover:from-orange-200/80 hover:to-red-200/80 backdrop-blur-sm'
+              : publicacion.estado?.toLowerCase().includes('programado')
+                ? 'bg-gradient-to-br from-blue-100/80 to-sky-100/80 border-blue-300/50 hover:bg-gradient-to-br hover:from-blue-200/80 hover:to-sky-200/80 backdrop-blur-sm'
+                : publicacion.estado === data?.cliente.clickupStatusNotStarted
+                  ? 'bg-gradient-to-br from-gray-100/80 to-slate-200/80 border-gray-300/50 hover:bg-gradient-to-br hover:from-gray-200/80 hover:to-slate-300/80 backdrop-blur-sm'
+                  : 'bg-gradient-to-br from-orange-100/80 to-red-100/80 border-orange-300/50 hover:bg-gradient-to-br hover:from-orange-200/80 hover:to-red-200/80 backdrop-blur-sm'
         } border ${dragDropEnabled ? 'active:cursor-grabbing' : ''} shadow-sm`}
         onClick={() => dragDropEnabled ? abrirComentarios(publicacion) : setSelectedPublicacion(publicacion)}
         title={dragDropEnabled ? "Arrastra para cambiar fecha" : "Click para ver detalles"}
@@ -908,7 +929,11 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                 ? 'bg-yellow-500' 
                 : publicacion.estado?.toLowerCase().includes('aprobado')
                   ? 'bg-green-500'
-                  : 'bg-orange-500'
+                  : publicacion.estado?.toLowerCase().includes('programado')
+                    ? 'bg-blue-500'
+                    : publicacion.estado === data?.cliente.clickupStatusNotStarted
+                      ? 'bg-gray-400'
+                      : 'bg-orange-500'
             }`} />
           </div>
         </div>
@@ -1411,6 +1436,20 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                 <HelpCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">Wiki</span>
               </Button>
+
+              {/* Toggle Sin Empezar (Solo Kanban y si está configurado) */}
+              {vistaActiva === 'kanban' && data.cliente.clickupStatusNotStarted && (
+                <Button
+                  variant={showNotStarted ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setShowNotStarted(!showNotStarted)}
+                  className={`flex items-center space-x-2 flex-shrink-0 ${showNotStarted ? 'bg-gray-200 text-gray-900 border-gray-300' : ''}`}
+                  title={showNotStarted ? "Ocultar columna Sin Empezar" : "Mostrar columna Sin Empezar"}
+                >
+                  <Columns className="h-4 w-4" />
+                  <span className="hidden sm:inline">Sin Empezar</span>
+                </Button>
+              )}
             </div>
             
             {/* Badges de estado */}
@@ -1742,6 +1781,10 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
             <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-6 p-4 bg-gray-50 border-t">
               <div className="flex items-center space-x-6">
                 <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                  <span className="text-sm text-gray-600">Sin empezar</span>
+                </div>
+                <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                   <span className="text-sm text-gray-600">Por revisar</span>
                 </div>
@@ -1866,6 +1909,10 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                         <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                           <div className="flex justify-center space-x-4 text-xs">
                             <div className="flex items-center space-x-1">
+                              <span>⚪</span>
+                              <span className="text-gray-600">Sin empezar</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
                               <span>🟡</span>
                               <span className="text-gray-600">Por revisar</span>
                             </div>
@@ -1919,6 +1966,9 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                     }
 
                     // Agrupar por estado
+                    const sinEmpezar = publicacionesDelDia.filter(pub => 
+                      data?.publicacionesSinEmpezar?.some(p => p.id === pub.id)
+                    );
                     const porRevisar = publicacionesDelDia.filter(pub => 
                       data?.publicacionesPorRevisar?.some(p => p.id === pub.id)
                     );
@@ -1931,6 +1981,19 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
                     return (
                       <div className="space-y-4">
+                        {/* Sin empezar */}
+                        {sinEmpezar.length > 0 && (
+                          <div>
+                            <div className="flex items-center space-x-2 mb-3">
+                              <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                              <h4 className="font-medium text-gray-900">Sin empezar ({sinEmpezar.length})</h4>
+                            </div>
+                            <div className="space-y-2">
+                              {sinEmpezar.map(pub => renderPublicacionCardMobile(pub))}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Por revisar */}
                         {porRevisar.length > 0 && (
                           <div>
@@ -1979,10 +2042,47 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         ) : (
           // Vista Kanban (por defecto)
           <div className="w-full">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 relative">
+            <div className={`grid grid-cols-1 ${showNotStarted ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6 lg:gap-8 relative`}>
               {/* Separador vertical derecho */}
               <div className="hidden lg:block absolute left-1/3 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent transform -translate-x-1/2 z-0"></div>
               <div className="hidden lg:block absolute left-2/3 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent transform -translate-x-1/2 z-0"></div>
+
+              {/* Columna: Sin Empezar (Opcional) */}
+              {showNotStarted && (
+                <div className="space-y-4 relative z-10">
+                  <div className="sticky top-0 z-10 bg-gradient-to-r from-gray-400 to-slate-500 backdrop-blur-xl border-2 border-gray-300 rounded-xl shadow-2xl shadow-gray-500/30 hover:shadow-gray-500/50 transition-all duration-300 hover:scale-105">
+                    <div className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-4 h-4 bg-white rounded-full shadow-md animate-pulse"></div>
+                        <h3 className="text-xl font-bold text-white drop-shadow-md">
+                          ⏳ Sin Empezar ({aplicarFiltros(data.publicacionesSinEmpezar || []).length})
+                        </h3>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    {aplicarFiltros(data.publicacionesSinEmpezar || [])
+                      .sort((a, b) => {
+                        // Ordenar por fecha más próxima primero
+                        if (!a.fechaProgramada && !b.fechaProgramada) return 0;
+                        if (!a.fechaProgramada) return 1;
+                        if (!b.fechaProgramada) return -1;
+                        return new Date(a.fechaProgramada).getTime() - new Date(b.fechaProgramada).getTime();
+                      })
+                      .map((publicacion) => (
+                        <Card key={publicacion.id} className="group hover:shadow-2xl hover:shadow-gray-500/10 transition-all duration-300 border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:-translate-y-1 border-l-4 border-l-gray-400 opacity-90 hover:opacity-100">
+                          {renderPublicacionCard(publicacion, false)}
+                        </Card>
+                      ))}
+                    {aplicarFiltros(data.publicacionesSinEmpezar || []).length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <div className="text-4xl mb-2">⏳</div>
+                        <p className="text-sm">No hay publicaciones sin empezar</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Columna: Por Revisar */}
               <div className="space-y-4 relative z-10">
@@ -2076,7 +2176,14 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                       return new Date(a.fechaProgramada).getTime() - new Date(b.fechaProgramada).getTime();
                     })
                     .map((publicacion) => (
-                      <Card key={publicacion.id} className="group hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300 border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:-translate-y-1 border-l-4 border-l-emerald-400">
+                      <Card 
+                        key={publicacion.id} 
+                        className={`group hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300 border-0 bg-white/70 backdrop-blur-sm shadow-lg hover:-translate-y-1 border-l-4 ${
+                          publicacion.estado?.toLowerCase().includes('programado') 
+                            ? 'border-l-blue-400' 
+                            : 'border-l-emerald-400'
+                        }`}
+                      >
                         {renderPublicacionCard(publicacion, false)}
                       </Card>
                     ))}

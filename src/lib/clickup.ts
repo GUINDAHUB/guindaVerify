@@ -21,10 +21,6 @@ export class ClickUpService {
   // Obtener tareas de una lista específica
   async getTasksFromList(listId: string, statuses?: string[], forceRefresh: boolean = false): Promise<ClickUpTask[]> {
     try {
-      console.log(`🔍 Obteniendo tareas de la lista: ${listId}`);
-      console.log(`📋 Estados filtrados:`, statuses);
-      console.log(`🔄 Forzar actualización:`, forceRefresh);
-      
       const params = new URLSearchParams({
         include_closed: 'false',
         subtasks: 'false',
@@ -40,7 +36,7 @@ export class ClickUpService {
       }
 
       const url = `${CLICKUP_API_BASE}/list/${listId}/task?${params.toString()}`;
-      console.log(`📡 URL de la petición: ${url}`);
+      // console.log(`📡 URL de la petición: ${url}`);
 
       const headers = {
         ...this.getHeaders(),
@@ -53,7 +49,6 @@ export class ClickUpService {
 
       const response = await axios.get(url, { headers });
 
-      console.log(`✅ Tareas obtenidas: ${response.data.tasks?.length || 0}`);
       return response.data.tasks || [];
     } catch (error: any) {
       console.error('❌ Error obteniendo tareas de ClickUp:', error);
@@ -82,8 +77,8 @@ export class ClickUpService {
   // Obtener TODAS las tareas de una lista (sin filtrar por estados)
   async getAllTasksFromList(listId: string, forceRefresh: boolean = false): Promise<ClickUpTask[]> {
     try {
-      console.log(`🔍 Obteniendo TODAS las tareas de la lista: ${listId}`);
-      console.log(`🔄 Forzar actualización:`, forceRefresh);
+      // console.log(`🔍 Obteniendo TODAS las tareas de la lista: ${listId}`);
+      // console.log(`🔄 Forzar actualización:`, forceRefresh);
       
       const params = new URLSearchParams({
         include_closed: 'false',
@@ -93,7 +88,7 @@ export class ClickUpService {
       });
 
       const url = `${CLICKUP_API_BASE}/list/${listId}/task?${params.toString()}`;
-      console.log(`📡 URL de la petición: ${url}`);
+      // console.log(`📡 URL de la petición: ${url}`);
 
       const headers = {
         ...this.getHeaders(),
@@ -106,7 +101,7 @@ export class ClickUpService {
 
       const response = await axios.get(url, { headers });
 
-      console.log(`✅ Todas las tareas obtenidas: ${response.data.tasks?.length || 0}`);
+      // console.log(`✅ Todas las tareas obtenidas: ${response.data.tasks?.length || 0}`);
       return response.data.tasks || [];
     } catch (error: any) {
       console.error('❌ Error obteniendo todas las tareas de ClickUp:', error);
@@ -153,7 +148,6 @@ export class ClickUpService {
 
       const response = await axios.get(url.toString(), { headers });
 
-      console.log(`🔍 Tarea obtenida: ${taskId}${forceRefresh ? ' (forced refresh)' : ''}`);
       return response.data;
     } catch (error) {
       console.error('Error obteniendo tarea de ClickUp:', error);
@@ -178,12 +172,6 @@ export class ClickUpService {
   // Actualizar la fecha de publicación (campo personalizado de ClickUp)
   async updateTaskDueDate(taskId: string, dueDate: number): Promise<void> {
     try {
-      console.log('🔍 Actualizando fecha de publicación de la tarea:', {
-        taskId,
-        dueDate,
-        fechaComprensible: new Date(dueDate).toISOString()
-      });
-
       // Primero obtener la tarea para encontrar el campo personalizado "Fecha de publicacion"
       const task = await this.getTask(taskId);
       const campoFechaPublicacion = task.custom_fields.find(field => 
@@ -194,44 +182,19 @@ export class ClickUpService {
       );
 
       if (campoFechaPublicacion) {
-        console.log('✅ Campo "Fecha de publicacion" encontrado, actualizando campo personalizado:', {
-          fieldId: campoFechaPublicacion.id,
-          fieldName: campoFechaPublicacion.name,
-          fieldType: campoFechaPublicacion.type
-        });
-
         // Actualizar el campo personalizado usando la API de ClickUp
-        const response = await axios.put(
+        await axios.put(
           `${CLICKUP_API_BASE}/task/${taskId}/field/${campoFechaPublicacion.id}`,
           { value: dueDate },
           { headers: this.getHeaders() }
         );
-
-        console.log('✅ ClickUp API - Campo personalizado actualizado:', {
-          status: response.status,
-          data: response.data,
-          taskId,
-          fieldId: campoFechaPublicacion.id,
-          newDueDate: dueDate,
-          fechaComprensible: new Date(dueDate).toISOString()
-        });
       } else {
-        console.log('⚠️ Campo "Fecha de publicacion" no encontrado, usando due_date como fallback');
-        
         // Fallback: actualizar la fecha límite usando la API estándar de ClickUp
-        const response = await axios.put(
+        await axios.put(
           `${CLICKUP_API_BASE}/task/${taskId}`,
           { due_date: dueDate },
           { headers: this.getHeaders() }
         );
-
-        console.log('✅ ClickUp API - Fecha límite actualizada (fallback):', {
-          status: response.status,
-          data: response.data,
-          taskId,
-          newDueDate: dueDate,
-          fechaComprensible: new Date(dueDate).toISOString()
-        });
       }
 
     } catch (error: any) {
@@ -297,7 +260,6 @@ export class ClickUpService {
         if (status === 404) {
           // Si el endpoint /team no funciona, intentar con /space
           try {
-            console.log('Intentando con endpoint /space...');
             const spaceResponse = await axios.get(
               `${CLICKUP_API_BASE}/space/${workspaceId}`,
               { headers: this.getHeaders() }
@@ -348,6 +310,86 @@ export class ClickUpService {
       } else {
         throw new Error(`Error de configuración: ${error.message}`);
       }
+    }
+  }
+
+  // Obtener todas las listas de un workspace
+  async getLists(workspaceId: string): Promise<any[]> {
+    try {
+      // 1. Obtener espacios
+      const spacesResponse = await axios.get(
+        `${CLICKUP_API_BASE}/team/${workspaceId}/space`,
+        { headers: this.getHeaders() }
+      );
+      
+      const spaces = spacesResponse.data.spaces || [];
+      const allLists: any[] = [];
+      
+      // 2. Iterar por cada espacio para obtener listas y carpetas
+      for (const space of spaces) {
+        // Obtener listas que no están en carpetas (folderless lists)
+        const folderlessListsResponse = await axios.get(
+          `${CLICKUP_API_BASE}/space/${space.id}/list`,
+          { headers: this.getHeaders() }
+        );
+        
+        const folderlessLists = folderlessListsResponse.data.lists || [];
+        folderlessLists.forEach((list: any) => {
+          allLists.push({
+            id: list.id,
+            name: list.name,
+            spaceName: space.name,
+            folderName: null
+          });
+        });
+        
+        // Obtener carpetas del espacio
+        const foldersResponse = await axios.get(
+          `${CLICKUP_API_BASE}/space/${space.id}/folder`,
+          { headers: this.getHeaders() }
+        );
+        
+        const folders = foldersResponse.data.folders || [];
+        
+        // 3. Obtener listas de cada carpeta
+        for (const folder of folders) {
+          const folderListsResponse = await axios.get(
+            `${CLICKUP_API_BASE}/folder/${folder.id}/list`,
+            { headers: this.getHeaders() }
+          );
+          
+          const folderLists = folderListsResponse.data.lists || [];
+          folderLists.forEach((list: any) => {
+            allLists.push({
+              id: list.id,
+              name: list.name,
+              spaceName: space.name,
+              folderName: folder.name
+            });
+          });
+        }
+      }
+      
+      return allLists;
+    } catch (error: any) {
+      console.error('Error obteniendo listas:', error);
+      throw new Error(`Error al obtener listas de ClickUp: ${error.message}`);
+    }
+  }
+
+  // Obtener estados de una lista
+  async getListStatuses(listId: string): Promise<any[]> {
+    try {
+      // Obtener información de la lista que incluye los estados
+      const response = await axios.get(
+        `${CLICKUP_API_BASE}/list/${listId}`,
+        { headers: this.getHeaders() }
+      );
+      
+      return response.data.statuses || [];
+    } catch (error: any) {
+      console.error('Error obteniendo estados de la lista:', error);
+      throw new Error(`Error al obtener estados de la lista: ${error.message}`);
     }
   }
 
@@ -506,12 +548,6 @@ export class ClickUpService {
       );
       
       if (campo && campo.value && campo.type_config) {
-        console.log(`🏷️ Campo encontrado: ${campo.name}`, {
-          type: campo.type,
-          value: campo.value,
-          type_config: campo.type_config
-        });
-
         // Para campos de tipo "labels", manejar múltiples selecciones
         if (campo.type === 'labels' && campo.type_config.options) {
           const selectedLabelIds = Array.isArray(campo.value) ? campo.value : [campo.value];
@@ -632,26 +668,26 @@ export class ClickUpService {
   }
 
   private extractFechaProgramada(task: ClickUpTask): string | undefined {
-    console.log(`\n🔍 === DEBUGGING FECHA PROGRAMADA - Tarea: ${task.name} (${task.id}) ===`);
+    // console.log(`\n🔍 === DEBUGGING FECHA PROGRAMADA - Tarea: ${task.name} (${task.id}) ===`);
     
     // Log de TODOS los campos personalizados para debugging
-    console.log(`📋 Todos los campos personalizados (${task.custom_fields.length}):`, 
-      task.custom_fields.map(f => ({
-        id: f.id,
-        name: f.name,
-        type: f.type,
-        value: f.value,
-        type_config: f.type_config
-      }))
-    );
+    // console.log(`📋 Todos los campos personalizados (${task.custom_fields.length}):`, 
+    //   task.custom_fields.map(f => ({
+    //     id: f.id,
+    //     name: f.name,
+    //     type: f.type,
+    //     value: f.value,
+    //     type_config: f.type_config
+    //   }))
+    // );
 
     // Log de fechas de tarea estándar
-    console.log(`📅 Fechas estándar de tarea:`, {
-      due_date: task.due_date,
-      start_date: task.start_date,
-      date_created: task.date_created,
-      date_updated: task.date_updated
-    });
+    // console.log(`📅 Fechas estándar de tarea:`, {
+    //   due_date: task.due_date,
+    //   start_date: task.start_date,
+    //   date_created: task.date_created,
+    //   date_updated: task.date_updated
+    // });
 
     // Estrategia 1: Buscar específicamente el campo "Fecha de publicacion"
     let campoFecha = task.custom_fields.find(field => 
@@ -663,19 +699,19 @@ export class ClickUpService {
     );
 
     if (campoFecha) {
-      console.log(`✅ Campo "Fecha de publicacion" encontrado:`, {
-        name: campoFecha.name,
-        type: campoFecha.type,
-        value: campoFecha.value
-      });
+      // console.log(`✅ Campo "Fecha de publicacion" encontrado:`, {
+      //   name: campoFecha.name,
+      //   type: campoFecha.type,
+      //   value: campoFecha.value
+      // });
     } else {
-      console.log(`❌ Campo "Fecha de publicacion" no encontrado, buscando alternativas...`);
+      // console.log(`❌ Campo "Fecha de publicacion" no encontrado, buscando alternativas...`);
       
       // Estrategia 2: Buscar campos tipo 'date' con nombres relacionados
       const camposFechaTipo = task.custom_fields.filter(field => field.type === 'date');
-      console.log(`🎯 Campos tipo 'date' encontrados (${camposFechaTipo.length}):`, 
-        camposFechaTipo.map(f => ({ name: f.name, value: f.value, type_config: f.type_config }))
-      );
+      // console.log(`🎯 Campos tipo 'date' encontrados (${camposFechaTipo.length}):`, 
+      //   camposFechaTipo.map(f => ({ name: f.name, value: f.value, type_config: f.type_config }))
+      // );
 
       // Estrategia 3: Buscar por nombre relacionado con fecha de publicación
       const camposFechaNombre = task.custom_fields.filter(field => 
@@ -686,9 +722,9 @@ export class ClickUpService {
          field.name.toLowerCase().includes('schedule') ||
          field.name.toLowerCase().includes('publish'))
       );
-      console.log(`📝 Campos por nombre relacionado con publicación (${camposFechaNombre.length}):`, 
-        camposFechaNombre.map(f => ({ name: f.name, value: f.value, type: f.type }))
-      );
+      // console.log(`📝 Campos por nombre relacionado con publicación (${camposFechaNombre.length}):`, 
+      //   camposFechaNombre.map(f => ({ name: f.name, value: f.value, type: f.type }))
+      // );
 
       // Priorizar: 1) campos tipo date con nombre relacionado, 2) cualquier campo tipo date
       campoFecha = camposFechaTipo.find(field => 
@@ -702,12 +738,12 @@ export class ClickUpService {
 
       if (!campoFecha && camposFechaTipo.length > 0) {
         campoFecha = camposFechaTipo[0];
-        console.log(`🔄 Usando primer campo tipo 'date' disponible:`, campoFecha.name);
+        // console.log(`🔄 Usando primer campo tipo 'date' disponible:`, campoFecha.name);
       }
 
       if (!campoFecha && camposFechaNombre.length > 0) {
         campoFecha = camposFechaNombre[0];
-        console.log(`🔄 Usando primer campo por nombre relacionado:`, campoFecha.name);
+        // console.log(`🔄 Usando primer campo por nombre relacionado:`, campoFecha.name);
       }
     }
     
@@ -718,33 +754,33 @@ export class ClickUpService {
     if (campoFecha && campoFecha.value !== null && campoFecha.value !== undefined) {
       fechaRaw = campoFecha.value.toString();
       fuente = `campo personalizado '${campoFecha.name}' (tipo: ${campoFecha.type})`;
-      console.log(`✅ Fecha encontrada en ${fuente}:`, { raw: fechaRaw, originalValue: campoFecha.value });
+      // console.log(`✅ Fecha encontrada en ${fuente}:`, { raw: fechaRaw, originalValue: campoFecha.value });
     } else if (task.due_date) {
       fechaRaw = task.due_date;
       fuente = 'due_date de la tarea (campo estándar) - FALLBACK';
-      console.log(`⚠️ Fecha encontrada en ${fuente}:`, fechaRaw);
-      console.log(`💡 Recomendación: Usar el campo personalizado 'Fecha de publicacion' en ClickUp`);
+      // console.log(`⚠️ Fecha encontrada en ${fuente}:`, fechaRaw);
+      // console.log(`💡 Recomendación: Usar el campo personalizado 'Fecha de publicacion' en ClickUp`);
     } else {
-      console.log(`❌ No se encontró fecha en ninguna fuente para tarea: ${task.name}`);
-      console.log(`🔍 Due date:`, task.due_date);
-      console.log(`🔍 Campos personalizados disponibles:`, task.custom_fields.map(f => ({ name: f.name, type: f.type, value: f.value })));
+      // console.log(`❌ No se encontró fecha en ninguna fuente para tarea: ${task.name}`);
+      // console.log(`🔍 Due date:`, task.due_date);
+      // console.log(`🔍 Campos personalizados disponibles:`, task.custom_fields.map(f => ({ name: f.name, type: f.type, value: f.value })));
       return undefined;
     }
 
     // Validar y convertir la fecha a formato ISO
     if (fechaRaw) {
       try {
-        console.log(`🔄 Procesando fecha raw: "${fechaRaw}" (tipo: ${typeof fechaRaw}) desde ${fuente}`);
+        // console.log(`🔄 Procesando fecha raw: "${fechaRaw}" (tipo: ${typeof fechaRaw}) desde ${fuente}`);
         
         // Si es un timestamp de ClickUp (solo números), convertir
         if (/^\d+$/.test(fechaRaw)) {
           const timestamp = parseInt(fechaRaw);
-          console.log(`⏰ Detectado timestamp numérico: ${timestamp}`);
+          // console.log(`⏰ Detectado timestamp numérico: ${timestamp}`);
           
           // ClickUp timestamps pueden estar en milisegundos o segundos
           // Si es menor que 10^12, probablemente sea en segundos
           const timestampMs = timestamp < 1e12 ? timestamp * 1000 : timestamp;
-          console.log(`⏰ Timestamp ajustado a ms: ${timestampMs}`);
+          // console.log(`⏰ Timestamp ajustado a ms: ${timestampMs}`);
           
           const date = new Date(timestampMs);
           if (!isNaN(date.getTime())) {
@@ -754,7 +790,7 @@ export class ClickUpService {
             const day = String(date.getUTCDate()).padStart(2, '0');
             const fechaLocal = `${year}-${month}-${day}`;
             
-            console.log(`✅ Fecha convertida desde timestamp: ${fechaLocal} (UTC: ${date.toISOString()})`);
+            // console.log(`✅ Fecha convertida desde timestamp: ${fechaLocal} (UTC: ${date.toISOString()})`);
             return fechaLocal;
           } else {
             console.error(`❌ Timestamp inválido: ${timestamp} -> ${date}`);
@@ -770,7 +806,7 @@ export class ClickUpService {
           const day = String(date.getUTCDate()).padStart(2, '0');
           const fechaLocal = `${year}-${month}-${day}`;
           
-          console.log(`✅ Fecha convertida desde string: ${fechaLocal} (UTC: ${date.toISOString()}, original: ${fechaRaw})`);
+          // console.log(`✅ Fecha convertida desde string: ${fechaLocal} (UTC: ${date.toISOString()}, original: ${fechaRaw})`);
           return fechaLocal;
         } else {
           console.error(`❌ Fecha inválida al parsear: "${fechaRaw}" -> ${date}`);
@@ -780,7 +816,7 @@ export class ClickUpService {
       }
     }
 
-    console.log(`❌ No se pudo extraer fecha válida de la tarea: ${task.name}`);
+    // console.log(`❌ No se pudo extraer fecha válida de la tarea: ${task.name}`);
     return undefined;
   }
 

@@ -16,6 +16,7 @@ interface LogEntry {
   accion: string;
   detalles?: string;
   tarea_id?: string;
+  tarea_nombre?: string;
   usuario_nombre?: string;
   usuario_username?: string;
   cliente_nombre?: string;
@@ -89,6 +90,7 @@ export function AdminLogsClient() {
         log.cliente_nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.accion.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.detalles?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.tarea_nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.tarea_id?.includes(searchTerm)
       );
     }
@@ -136,14 +138,14 @@ export function AdminLogsClient() {
 
   const exportLogs = () => {
     const csvContent = [
-      ['Fecha', 'Usuario', 'Cliente', 'Acción', 'Detalles', 'Tarea ID', 'IP'].join(','),
+      ['Fecha', 'Usuario', 'Cliente', 'Acción', 'Detalles', 'Tarea', 'IP'].join(','),
       ...filteredLogs.map(log => [
         formatFecha(log.fecha),
         log.usuario_nombre || '-',
         log.cliente_nombre || '-',
         log.accion,
         log.detalles || '-',
-        log.tarea_id || '-',
+        log.tarea_nombre || log.tarea_id || '-',
         log.ip_address || '-'
       ].map(field => `"${field}"`).join(','))
     ].join('\n');
@@ -194,7 +196,7 @@ export function AdminLogsClient() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
-                    placeholder="Buscar por usuario, cliente, acción, detalles o tarea ID..."
+                    placeholder="Buscar por usuario, cliente, acción, detalles o tarea..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -300,10 +302,17 @@ export function AdminLogsClient() {
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          {log.tarea_id ? (
-                            <code className="bg-gray-100 px-2 py-1 rounded text-sm">
-                              {log.tarea_id}
-                            </code>
+                          {log.tarea_nombre || log.tarea_id ? (
+                            <div>
+                              <div className="font-medium">
+                                {log.tarea_nombre || log.tarea_id}
+                              </div>
+                              {log.tarea_nombre && log.tarea_id && (
+                                <div className="text-xs text-gray-500">
+                                  ID: {log.tarea_id}
+                                </div>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-gray-400">-</span>
                           )}

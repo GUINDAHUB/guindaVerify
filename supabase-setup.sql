@@ -199,6 +199,10 @@ COMMENT ON COLUMN clientes.estados_aprobacion IS 'Estados a los que se mueve al 
 COMMENT ON COLUMN clientes.estados_rechazo IS 'Estados a los que se mueve al rechazar';
 COMMENT ON COLUMN clientes.password_hash IS 'Hash de la contraseña para acceso al portal del cliente';
 
+-- Agregar columna para estado "Sin Empezar"
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS clickup_status_not_started VARCHAR(255);
+COMMENT ON COLUMN clientes.clickup_status_not_started IS 'Estado de ClickUp para publicaciones sin empezar (visible en calendario, opcional en kanban)';
+
 -- Insertar contraseña por defecto para administradores (contraseña: "admin123")
 -- Cambiar esta contraseña después de la primera configuración
 INSERT INTO auth_admin (password_hash) 

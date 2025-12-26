@@ -57,6 +57,12 @@ export async function GET(
     };
 
     // Categorizar y ordenar publicaciones por estado
+    const publicacionesSinEmpezar = ordenarPorFecha(
+      (todasLasPublicaciones || []).filter(pub => 
+        pub && cliente.clickupStatusNotStarted && pub.estado === cliente.clickupStatusNotStarted
+      )
+    );
+
     const publicacionesPorRevisar = ordenarPorFecha(
       (todasLasPublicaciones || []).filter(pub => 
         pub && cliente.estadosVisibles && cliente.estadosVisibles.includes(pub.estado)
@@ -75,20 +81,22 @@ export async function GET(
       )
     );
 
-    console.log('📊 Estadísticas de categorización:');
-    console.log(`- Total tareas: ${(todasLasPublicaciones || []).length}`);
-    console.log(`- Por revisar: ${publicacionesPorRevisar.length}`);
-    console.log(`- Pendientes cambios: ${publicacionesPendientesCambios.length}`);
-    console.log(`- Aprobadas: ${publicacionesAprobadas.length}`);
+    // 📊 Estadísticas de categorización (desactivado para reducir logs)
+    // console.log('📊 Estadísticas de categorización:');
+    // console.log(`- Total tareas: ${(todasLasPublicaciones || []).length}`);
+    // console.log(`- Sin empezar: ${publicacionesSinEmpezar.length}`);
+    // console.log(`- Por revisar: ${publicacionesPorRevisar.length}`);
+    // console.log(`- Pendientes cambios: ${publicacionesPendientesCambios.length}`);
+    // console.log(`- Aprobadas: ${publicacionesAprobadas.length}`);
 
-    // 🔔 Detectar nuevas publicaciones para notificaciones
-    try {
-      const notificationService = getNotificationService();
-      await notificationService.detectNewPublications(cliente.id, publicacionesPorRevisar);
-    } catch (error) {
-      console.error('⚠️ Error detectando nuevas publicaciones para notificaciones:', error);
-      // No fallar la respuesta principal por un error de notificaciones
-    }
+    // 🔔 Detectar nuevas publicaciones para notificaciones (DESACTIVADO TEMPORALMENTE)
+    // try {
+    //   const notificationService = getNotificationService();
+    //   await notificationService.detectNewPublications(cliente.id, publicacionesPorRevisar);
+    // } catch (error) {
+    //   console.error('⚠️ Error detectando nuevas publicaciones para notificaciones:', error);
+    //   // No fallar la respuesta principal por un error de notificaciones
+    // }
 
     return NextResponse.json({
       cliente: {
@@ -97,12 +105,15 @@ export async function GET(
         codigo: cliente.codigo,
         logoUrl: cliente.logoUrl,
         clickupListId: cliente.clickupListId,
+        clickupStatusNotStarted: cliente.clickupStatusNotStarted,
         dragDropEnabled: cliente.dragDropEnabled ?? true,
       },
+      publicacionesSinEmpezar: publicacionesSinEmpezar || [],
       publicacionesPorRevisar: publicacionesPorRevisar || [],
       publicacionesPendientesCambios: publicacionesPendientesCambios || [], 
       publicacionesAprobadas: publicacionesAprobadas || [],
       total: {
+        sinEmpezar: (publicacionesSinEmpezar || []).length,
         porRevisar: (publicacionesPorRevisar || []).length,
         pendientesCambios: (publicacionesPendientesCambios || []).length,
         aprobadas: (publicacionesAprobadas || []).length,

@@ -3,13 +3,13 @@ import { isClientAuthenticated } from '@/lib/auth';
 import { ClientLoginClient } from './client';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     codigo: string;
-  };
+  }>;
 }
 
 export default async function ClientLoginPage({ params }: PageProps) {
-  const { codigo } = params;
+  const { codigo } = await params;
 
   // Si ya está autenticado, redirigir al portal del cliente
   if (await isClientAuthenticated(codigo)) {

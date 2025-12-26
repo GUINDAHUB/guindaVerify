@@ -1,80 +1,105 @@
 'use client';
 
 import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { toast } from 'sonner';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface LoginFormProps {
   title: string;
   description: string;
   onSubmit: (password: string) => Promise<boolean>;
-  isLoading?: boolean;
   placeholder?: string;
 }
 
-export function LoginForm({ 
-  title, 
-  description, 
-  onSubmit, 
-  isLoading = false,
-  placeholder = "Introduce tu contraseña"
+export function LoginForm({
+  title,
+  description,
+  onSubmit,
+  placeholder = "Contraseña"
 }: LoginFormProps) {
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!password.trim()) {
-      toast.error('Por favor, introduce una contraseña');
+      setError('Por favor, introduce tu contraseña');
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
+    setError('');
+
     try {
       const success = await onSubmit(password);
+      
       if (!success) {
-        toast.error('Contraseña incorrecta');
-        setPassword('');
+        setError('Contraseña incorrecta');
       }
     } catch (error) {
-      console.error('Error en login:', error);
-      toast.error('Error al iniciar sesión');
+      setError('Error de conexión. Inténtalo de nuevo.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+        <CardHeader className="space-y-4">
+          <CardTitle className="text-2xl font-bold text-center">{title}</CardTitle>
+          <CardDescription className="text-center">{description}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={placeholder}
-                disabled={loading || isLoading}
-                autoFocus
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={placeholder}
+                  disabled={isLoading}
+                  autoComplete="current-password"
+                  autoFocus
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={isLoading}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={loading || isLoading}
+
+            {error && (
+              <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
+                {error}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading || !password.trim()}
             >
-              {loading || isLoading ? 'Verificando...' : 'Acceder'}
+              {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </form>
         </CardContent>
@@ -82,3 +107,8 @@ export function LoginForm({
     </div>
   );
 }
+
+
+
+
+

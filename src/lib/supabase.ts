@@ -78,6 +78,7 @@ export class SupabaseService {
         logo_url: cliente.logoUrl,
         clickup_list_id: cliente.clickupListId,
         estados_visibles: cliente.estadosVisibles,
+        clickup_status_not_started: cliente.clickupStatusNotStarted,
         estados_aprobacion: cliente.estadosAprobacion,
         estados_rechazo: cliente.estadosRechazo,
         activo: cliente.activo,
@@ -113,6 +114,7 @@ export class SupabaseService {
       if (updates.logoUrl !== undefined) updatesDB.logo_url = updates.logoUrl;
       if (updates.clickupListId) updatesDB.clickup_list_id = updates.clickupListId;
       if (updates.estadosVisibles) updatesDB.estados_visibles = updates.estadosVisibles;
+      if (updates.clickupStatusNotStarted) updatesDB.clickup_status_not_started = updates.clickupStatusNotStarted;
       if (updates.estadosAprobacion) updatesDB.estados_aprobacion = updates.estadosAprobacion;
       if (updates.estadosRechazo) updatesDB.estados_rechazo = updates.estadosRechazo;
       if (updates.activo !== undefined) updatesDB.activo = updates.activo;
@@ -168,6 +170,7 @@ export class SupabaseService {
       logoUrl: data.logo_url,
       clickupListId: data.clickup_list_id,
       estadosVisibles: data.estados_visibles || [],
+      clickupStatusNotStarted: data.clickup_status_not_started,
       estadosAprobacion: data.estados_aprobacion || [],
       estadosRechazo: data.estados_rechazo || [],
       activo: data.activo,

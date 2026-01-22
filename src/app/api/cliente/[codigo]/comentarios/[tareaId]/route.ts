@@ -38,8 +38,8 @@ export async function GET(
     // Obtener comentarios de nuestra base de datos
     const comentariosDB = await supabaseService.getComentariosByTarea(tareaId);
 
-    // Fecha de corte para el sistema de privacidad híbrido: 21 de Enero 2026 a las 18:00
-    const CUTOFF_TIMESTAMP = new Date('2026-01-21T18:00:00').getTime();
+    // Fecha de corte para el sistema de privacidad híbrido: 21 de Enero 2026 a las 18:00 (hora española CET)
+    const CUTOFF_TIMESTAMP = new Date('2026-01-21T18:00:00+01:00').getTime();
 
     // Función para detectar si un comentario de ClickUp es realmente del cliente
     const esComentarioDelCliente = (contenido: string) => {

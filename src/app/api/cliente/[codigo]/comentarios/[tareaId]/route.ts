@@ -38,6 +38,9 @@ export async function GET(
     // Obtener comentarios de nuestra base de datos
     const comentariosDB = await supabaseService.getComentariosByTarea(tareaId);
 
+    // Fecha de corte para el sistema de privacidad híbrido: 21 de Enero 2026 a las 18:00
+    const CUTOFF_TIMESTAMP = new Date('2026-01-21T18:00:00').getTime();
+
     // Función para detectar si un comentario de ClickUp es realmente del cliente
     const esComentarioDelCliente = (contenido: string) => {
       // Buscar el patrón [Usuario]: en cualquier parte del contenido (puede haber emojis antes)
@@ -52,50 +55,70 @@ export async function GET(
 
     // Combinar y formatear comentarios
     const comentariosCombinados = [
-      // Comentarios de ClickUp
-      ...comentariosClickUp.map((comment: { 
-        id: string; 
-        comment_text: string; 
-        date: string; 
-        user?: { 
-          username?: string; 
-          email?: string; 
-          profilePicture?: string; 
-        } 
-      }) => {
-        const esDelCliente = esComentarioDelCliente(comment.comment_text);
-        
-        if (esDelCliente) {
-          // Es un comentario del cliente enviado a través de ClickUp
-          const nombreUsuario = extraerNombreUsuario(comment.comment_text);
-          return {
-            id: comment.id,
-            contenido: comment.comment_text,
-            fechaCreacion: new Date(parseInt(comment.date)),
-            autor: {
-              nombre: nombreUsuario || cliente.nombre,
-              email: cliente.email || '',
-              avatar: cliente.logoUrl || null,
-            },
-            fuente: 'cliente_via_clickup',
-            tipo: 'comentario_cliente',
-          };
-        } else {
-          // Es un comentario real del admin en ClickUp
-          return {
-            id: comment.id,
-            contenido: comment.comment_text,
-            fechaCreacion: new Date(parseInt(comment.date)),
-            autor: {
-              nombre: comment.user?.username || 'Usuario desconocido',
-              email: comment.user?.email || '',
-              avatar: comment.user?.profilePicture || null,
-            },
-            fuente: 'clickup',
-            tipo: 'comentario',
-          };
-        }
-      }),
+      // Comentarios de ClickUp con filtrado híbrido
+      ...comentariosClickUp
+        .map((comment: { 
+          id: string; 
+          comment_text: string; 
+          date: string; 
+          user?: { 
+            username?: string; 
+            email?: string; 
+            profilePicture?: string; 
+          } 
+        }) => {
+          const commentTimestamp = parseInt(comment.date);
+          const esDelCliente = esComentarioDelCliente(comment.comment_text);
+          
+          if (esDelCliente) {
+            // Es un comentario del cliente enviado a través de ClickUp
+            const nombreUsuario = extraerNombreUsuario(comment.comment_text);
+            return {
+              id: comment.id,
+              contenido: comment.comment_text,
+              fechaCreacion: new Date(commentTimestamp),
+              autor: {
+                nombre: nombreUsuario || cliente.nombre,
+                email: cliente.email || '',
+                avatar: cliente.logoUrl || null,
+              },
+              fuente: 'cliente_via_clickup',
+              tipo: 'comentario_cliente',
+              shouldShow: true, // Los comentarios del cliente siempre se muestran
+            };
+          } else {
+            // Es un comentario del admin en ClickUp - aplicar lógica de privacidad
+            let contenidoFinal = comment.comment_text;
+            let shouldShow = false;
+            
+            if (commentTimestamp < CUTOFF_TIMESTAMP) {
+              // Comentario antiguo: mostrar tal cual (mantener historial)
+              shouldShow = true;
+            } else {
+              // Comentario nuevo: solo mostrar si incluye ///
+              if (comment.comment_text.includes('///')) {
+                shouldShow = true;
+                // Limpiar las tres barras del texto final
+                contenidoFinal = comment.comment_text.replace(/\/\/\//g, '');
+              }
+            }
+            
+            return {
+              id: comment.id,
+              contenido: contenidoFinal,
+              fechaCreacion: new Date(commentTimestamp),
+              autor: {
+                nombre: comment.user?.username || 'Usuario desconocido',
+                email: comment.user?.email || '',
+                avatar: comment.user?.profilePicture || null,
+              },
+              fuente: 'clickup',
+              tipo: 'comentario',
+              shouldShow,
+            };
+          }
+        })
+        .filter((comment: any) => comment.shouldShow), // Filtrar solo los que deben mostrarse
       // Comentarios de nuestra DB (clientes directos)
       ...comentariosDB.map((comment) => ({
         id: comment.id,

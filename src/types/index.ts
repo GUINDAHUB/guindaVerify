@@ -13,6 +13,8 @@ export interface Cliente {
   estadosRechazo: string[]; // Estados cuando rechaza
   activo: boolean;
   dragDropEnabled?: boolean; // Permite arrastrar publicaciones en el calendario
+  notifyNewPublications?: boolean; // Notificaciones de nuevas publicaciones en revision
+  notifyNewComments?: boolean; // Notificaciones de nuevos comentarios (uso futuro)
   createdAt: Date;
   updatedAt: Date;
 }

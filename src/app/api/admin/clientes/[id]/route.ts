@@ -8,7 +8,20 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { codigo, nombre, email, logoUrl, clickupListId, estadosVisibles, clickupStatusNotStarted, estadosAprobacion, estadosRechazo, dragDropEnabled } = body;
+    const {
+      codigo,
+      nombre,
+      email,
+      logoUrl,
+      clickupListId,
+      estadosVisibles,
+      clickupStatusNotStarted,
+      estadosAprobacion,
+      estadosRechazo,
+      dragDropEnabled,
+      notifyNewPublications,
+      notifyNewComments
+    } = body;
 
     // Validaciones básicas
     if (!codigo || !nombre || !clickupListId) {
@@ -52,6 +65,8 @@ export async function PUT(
       estadosAprobacion: estadosAprobacion || [],
       estadosRechazo: estadosRechazo || [],
       dragDropEnabled: dragDropEnabled ?? true,
+      notifyNewPublications: notifyNewPublications ?? false,
+      notifyNewComments: notifyNewComments ?? false,
     });
 
     if (!clienteActualizado) {

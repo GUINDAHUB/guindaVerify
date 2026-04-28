@@ -29,7 +29,9 @@ export function AdminPageClient() {
     clickupStatusNotStarted: '',
     estadosAprobacion: '',
     estadosRechazo: '',
-    dragDropEnabled: true
+    dragDropEnabled: true,
+    notifyNewPublications: false,
+    notifyNewComments: false
   });
 
   // Nuevos estados para ClickUp
@@ -258,6 +260,8 @@ export function AdminPageClient() {
       estadosAprobacion: cliente.estadosAprobacion.join(', '),
       estadosRechazo: cliente.estadosRechazo.join(', '),
       dragDropEnabled: cliente.dragDropEnabled ?? true,
+      notifyNewPublications: cliente.notifyNewPublications ?? false,
+      notifyNewComments: cliente.notifyNewComments ?? false,
     });
     
     // Configurar los estados seleccionados para el modo edición
@@ -286,7 +290,9 @@ export function AdminPageClient() {
       clickupStatusNotStarted: '',
       estadosAprobacion: '',
       estadosRechazo: '',
-      dragDropEnabled: true
+      dragDropEnabled: true,
+      notifyNewPublications: false,
+      notifyNewComments: false
     });
     
     // Limpiar los nuevos estados
@@ -855,6 +861,48 @@ export function AdminPageClient() {
                         checked={!!formData.dragDropEnabled}
                         onCheckedChange={(checked) => {
                           setFormData(prev => ({...prev, dragDropEnabled: checked}));
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50 mt-3">
+                      <div className="flex items-center space-x-3">
+                        <Mail className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <Label htmlFor="notifyNewPublications" className="text-sm font-medium">
+                            Notificar nuevas publicaciones
+                          </Label>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Enviar email cuando haya nuevas publicaciones en estado "por revisar"
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        id="notifyNewPublications"
+                        checked={!!formData.notifyNewPublications}
+                        onCheckedChange={(checked) => {
+                          setFormData(prev => ({...prev, notifyNewPublications: checked}));
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50 mt-3">
+                      <div className="flex items-center space-x-3">
+                        <Mail className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <Label htmlFor="notifyNewComments" className="text-sm font-medium">
+                            Notificar nuevos comentarios
+                          </Label>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Reservado para uso futuro
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        id="notifyNewComments"
+                        checked={!!formData.notifyNewComments}
+                        onCheckedChange={(checked) => {
+                          setFormData(prev => ({...prev, notifyNewComments: checked}));
                         }}
                       />
                     </div>

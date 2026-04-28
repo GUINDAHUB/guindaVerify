@@ -29,7 +29,19 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { clickupApiKey, clickupWorkspaceId, estadosPorDefecto } = body;
+    const {
+      clickupApiKey,
+      clickupWorkspaceId,
+      estadosPorDefecto,
+      smtpHost,
+      smtpPort,
+      smtpSecure,
+      smtpUser,
+      smtpPass,
+      smtpFromName,
+      smtpFromEmail,
+      smtpEnabled
+    } = body;
 
     // Validaciones básicas
     if (!clickupApiKey || !clickupWorkspaceId) {
@@ -49,7 +61,15 @@ export async function POST(request: NextRequest) {
         pendienteRevision: 'Pendiente de Revisión',
         aprobado: 'Aprobado',
         rechazado: 'Rechazado'
-      }
+      },
+      smtpHost,
+      smtpPort,
+      smtpSecure,
+      smtpUser,
+      smtpPass,
+      smtpFromName,
+      smtpFromEmail,
+      smtpEnabled
     });
 
     if (!success) {

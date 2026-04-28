@@ -34,6 +34,7 @@ export function AdminLogsClient() {
   const [selectedAccion, setSelectedAccion] = useState<string>('all');
   const [clientes, setClientes] = useState<any[]>([]);
   const [acciones, setAcciones] = useState<string[]>([]);
+  const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadLogs();
@@ -53,7 +54,7 @@ export function AdminLogsClient() {
         setLogs(data.logs);
         
         // Extraer acciones únicas
-        const uniqueAcciones = [...new Set(data.logs.map((log: LogEntry) => log.accion))];
+        const uniqueAcciones = [...new Set(data.logs.map((log: LogEntry) => log.accion))] as string[];
         setAcciones(uniqueAcciones);
       } else {
         toast.error('Error al cargar logs');
@@ -126,7 +127,8 @@ export function AdminLogsClient() {
       aprobar: 'bg-blue-100 text-blue-800',
       hay_cambios: 'bg-yellow-100 text-yellow-800',
       comentar: 'bg-purple-100 text-purple-800',
-      migracion_sistema: 'bg-orange-100 text-orange-800'
+      migracion_sistema: 'bg-orange-100 text-orange-800',
+      notificacion_email_enviada: 'bg-indigo-100 text-indigo-800'
     };
 
     return (
@@ -159,6 +161,13 @@ export function AdminLogsClient() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const toggleDetails = (logId: string) => {
+    setExpandedDetails((prev) => ({
+      ...prev,
+      [logId]: !prev[logId]
+    }));
   };
 
   return (
@@ -294,8 +303,22 @@ export function AdminLogsClient() {
                         </td>
                         <td className="py-3 px-4 max-w-xs">
                           {log.detalles ? (
-                            <div className="truncate" title={log.detalles}>
-                              {log.detalles}
+                            <div>
+                              <div
+                                className={expandedDetails[log.id] ? "whitespace-normal break-words" : "truncate"}
+                                title={log.detalles}
+                              >
+                                {log.detalles}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-auto p-0 mt-1 text-xs text-blue-600 hover:text-blue-800"
+                                onClick={() => toggleDetails(log.id)}
+                              >
+                                {expandedDetails[log.id] ? 'Ver menos' : 'Ver completo'}
+                              </Button>
                             </div>
                           ) : (
                             <span className="text-gray-400">-</span>

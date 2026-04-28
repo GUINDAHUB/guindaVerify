@@ -1,4 +1,4 @@
-import { getSupabaseService } from './supabase';
+import { getSupabaseService, supabase } from './supabase';
 import { getEmailService } from './email';
 import { getClientUsers } from './auth';
 
@@ -26,7 +26,7 @@ export class NotificationService {
 
   // Propiedad para acceder a supabase directamente
   get supabase() {
-    return this.supabaseService.supabase;
+    return supabase;
   }
 
   private constructor() {}
@@ -304,7 +304,11 @@ export class NotificationService {
       const nuevasPublicaciones = notifications.filter(n => n.tipoNotificacion === 'nueva_publicacion');
       
       if (nuevasPublicaciones.length > 0) {
-        await this.sendNewPublicationsEmail(cliente, usuariosConEmail, nuevasPublicaciones);
+        if (cliente.notifyNewPublications) {
+          await this.sendNewPublicationsEmail(cliente, usuariosConEmail, nuevasPublicaciones);
+        } else {
+          console.log(`ℹ️ Notificaciones de nuevas publicaciones desactivadas para cliente ${cliente.nombre}`);
+        }
       }
 
       // Marcar todas las notificaciones como procesadas
@@ -450,7 +454,7 @@ export class NotificationService {
       `;
 
       // Enviar a todos los usuarios con email
-      const emails = usuariosConEmail.map(user => user.email);
+      const emails = usuarios.map((user: any) => user.email).filter(Boolean);
       
       await emailService.sendEmail({
         to: emails,
@@ -459,9 +463,39 @@ export class NotificationService {
       });
 
       console.log(`✅ Email de nuevas publicaciones enviado a ${emails.length} usuarios de ${cliente.nombre}`);
+      await this.logNotificationSent(cliente, notifications, emails);
 
     } catch (error) {
       console.error('❌ Error enviando email de nuevas publicaciones:', error);
+    }
+  }
+
+  /**
+   * Registra en logs del sistema los emails de notificaciones enviados.
+   */
+  private async logNotificationSent(
+    cliente: any,
+    notifications: PendingNotification[],
+    emails: string[]
+  ): Promise<void> {
+    try {
+      const detalles = `Email de nuevas publicaciones enviado a ${emails.length} destinatarios: ${emails.join(', ')}`;
+
+      const { error } = await this.supabase
+        .from('logs_actividad')
+        .insert({
+          usuario_id: null,
+          cliente_id: cliente.id,
+          accion: 'notificacion_email_enviada',
+          detalles,
+          tarea_id: notifications.length === 1 ? notifications[0].tareaId : null
+        });
+
+      if (error) {
+        console.error('❌ Error registrando log de notificación:', error);
+      }
+    } catch (error) {
+      console.error('❌ Error en logNotificationSent:', error);
     }
   }
 }

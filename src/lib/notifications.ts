@@ -356,9 +356,9 @@ export class NotificationService {
           : 'Sin fecha programada';
         
         return `
-          <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #4f46e5;">
-            <h3 style="margin: 0 0 8px 0; color: #1e293b; font-size: 16px;">${datos.titulo}</h3>
-            <p style="margin: 0; color: #64748b; font-size: 14px;">
+          <div style="background: #F2E1E9; padding: 15px; border-radius: 16px; margin: 10px 0; border-left: 4px solid #E40046;">
+            <h3 style="margin: 0 0 8px 0; color: #8D1737; font-size: 16px; font-weight: 700;">${datos.titulo}</h3>
+            <p style="margin: 0; color: #1A1A1A; font-size: 14px;">
               📅 Programada para: <strong>${fechaTexto}</strong>
             </p>
           </div>
@@ -373,49 +373,57 @@ export class NotificationService {
           <head>
             <meta charset="utf-8">
             <title>Nuevas Publicaciones - ${cliente.nombre}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
             <style>
               body { 
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-                line-height: 1.6; 
-                color: #333; 
+                font-family: 'Rethink Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+                line-height: 1.618;
+                color: #1A1A1A;
                 margin: 0; 
                 padding: 0; 
-                background-color: #f8fafc;
+                background-color: #F2E1E9;
               }
               .container { 
                 max-width: 600px; 
                 margin: 20px auto; 
                 background: white; 
-                border-radius: 12px; 
+                border-radius: 24px;
                 overflow: hidden; 
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                border: 1px solid #F2E1E9;
+                box-shadow: 0 8px 24px rgba(141, 23, 55, 0.12);
               }
               .header { 
-                background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); 
+                background: linear-gradient(135deg, #8D1737 0%, #E40046 72%);
                 color: white; 
-                padding: 30px 20px; 
+                padding: 32px 24px;
                 text-align: center; 
               }
-              .header h1 { margin: 0; font-size: 24px; font-weight: 700; }
-              .header p { margin: 10px 0 0 0; opacity: 0.9; }
-              .content { padding: 30px; }
+              .header h1 { margin: 0; font-size: 24px; font-weight: 800; }
+              .header p { margin: 10px 0 0 0; opacity: 0.95; font-weight: 500; }
+              .content { padding: 30px 24px; }
               .cta-button {
                 display: inline-block;
-                background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-                color: white;
+                background: #E40046;
+                color: #FFFFFF !important;
                 padding: 12px 24px;
                 text-decoration: none;
-                border-radius: 8px;
+                border-radius: 9999px;
                 font-weight: 600;
                 margin: 20px 0;
               }
+              .cta-button:visited,
+              .cta-button:hover,
+              .cta-button:active {
+                color: #FFFFFF !important;
+                text-decoration: none;
+              }
               .footer { 
-                background: #f8fafc; 
+                background: #F2E1E9;
                 text-align: center; 
                 padding: 20px; 
-                color: #6b7280; 
+                color: #8D1737;
                 font-size: 14px; 
-                border-top: 1px solid #e5e7eb;
+                border-top: 1px solid #E40046;
               }
             </style>
           </head>

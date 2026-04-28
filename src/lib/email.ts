@@ -152,53 +152,56 @@ export class EmailService {
         <head>
           <meta charset="utf-8">
           <title>Email de Prueba</title>
+          <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
           <style>
             body { 
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
-              line-height: 1.6; 
-              color: #333; 
+              font-family: 'Rethink Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+              line-height: 1.618;
+              color: #1A1A1A;
               margin: 0; 
               padding: 0; 
-              background-color: #f8fafc;
+              background-color: #F2E1E9;
             }
             .container { 
               max-width: 600px; 
               margin: 20px auto; 
               background: white; 
-              border-radius: 12px; 
+              border-radius: 24px; 
               overflow: hidden; 
-              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+              border: 1px solid #F2E1E9;
+              box-shadow: 0 8px 24px rgba(141, 23, 55, 0.12);
             }
             .header { 
-              background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); 
+              background: linear-gradient(135deg, #8D1737 0%, #E40046 72%);
               color: white; 
-              padding: 30px 20px; 
+              padding: 32px 24px;
               text-align: center; 
             }
-            .header h1 { margin: 0; font-size: 28px; font-weight: 700; }
-            .header p { margin: 10px 0 0 0; opacity: 0.9; font-size: 16px; }
-            .content { padding: 30px; }
+            .header h1 { margin: 0; font-size: 28px; font-weight: 800; }
+            .header p { margin: 10px 0 0 0; opacity: 0.95; font-size: 16px; font-weight: 500; }
+            .content { padding: 30px 24px; }
             .success { 
-              background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
-              color: white; 
+              background: #E40046;
+              color: #FFFFFF;
               padding: 20px; 
-              border-radius: 8px; 
+              border-radius: 16px;
               margin: 20px 0; 
               text-align: center;
               font-weight: 600;
               font-size: 18px;
             }
             .info { 
-              background: #f1f5f9; 
-              border: 1px solid #e2e8f0;
+              background: #F2E1E9;
+              border: 1px solid #E40046;
               padding: 20px; 
-              border-radius: 8px; 
+              border-radius: 16px;
               margin: 20px 0; 
             }
             .info h3 { 
               margin: 0 0 15px 0; 
-              color: #1e293b; 
+              color: #8D1737;
               font-size: 18px;
+              font-weight: 700;
             }
             .info ul { 
               margin: 0; 
@@ -206,19 +209,20 @@ export class EmailService {
             }
             .info li { 
               margin: 8px 0; 
-              color: #475569;
+              color: #1A1A1A;
             }
             .steps { 
-              background: #fef3c7; 
-              border: 1px solid #fbbf24;
+              background: #FFFFFF;
+              border: 1px solid #8D1737;
               padding: 20px; 
-              border-radius: 8px; 
+              border-radius: 16px;
               margin: 20px 0; 
             }
             .steps h3 { 
               margin: 0 0 15px 0; 
-              color: #92400e; 
+              color: #8D1737;
               font-size: 18px;
+              font-weight: 700;
             }
             .steps ol { 
               margin: 0; 
@@ -226,23 +230,23 @@ export class EmailService {
             }
             .steps li { 
               margin: 8px 0; 
-              color: #a16207;
+              color: #1A1A1A;
             }
             .footer { 
-              background: #f8fafc; 
+              background: #F2E1E9;
               text-align: center; 
               padding: 20px; 
-              color: #6b7280; 
+              color: #8D1737;
               font-size: 14px; 
-              border-top: 1px solid #e5e7eb;
+              border-top: 1px solid #E40046;
             }
             .footer p { margin: 5px 0; }
             .badge {
               display: inline-block;
-              background: #ddd6fe;
-              color: #5b21b6;
+              background: #8D1737;
+              color: #FFFFFF;
               padding: 4px 12px;
-              border-radius: 20px;
+              border-radius: 9999px;
               font-size: 12px;
               font-weight: 600;
               margin: 0 4px;
@@ -283,7 +287,7 @@ export class EmailService {
                 </ol>
               </div>
               
-              <p style="margin-top: 30px; padding: 15px; background: #ecfdf5; border-radius: 6px; color: #065f46;">
+              <p style="margin-top: 30px; padding: 15px; background: #F2E1E9; border-radius: 16px; color: #8D1737; border: 1px solid #E40046;">
                 <strong>💡 Tip:</strong> Puedes enviar este tipo de emails de prueba cuando quieras verificar que la configuración sigue funcionando correctamente.
               </p>
             </div>

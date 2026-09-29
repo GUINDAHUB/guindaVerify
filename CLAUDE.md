@@ -153,11 +153,10 @@ Pendiente:
 
 - **Los emails de notificación no se envían desde el 11-sep-2026**: el SMTP de `configuracion_sistema` está vacío (la fila se modificó por última vez el 22-sep). Desde el 11-sep se han creado 59 notificaciones que se marcan como procesadas sin enviarse. `updateConfiguracionSistema` pone a `null` cualquier campo SMTP que no venga en el POST.
 - Portal (según la revisión del código):
-  - En el modal de detalle, "Solicitar cambios" usa un estado desactualizado (`setComentario` + `handleAccion` en la misma llamada, L2220).
-  - El calendario móvil puede mostrar las fechas desplazadas un día (medianoche local + `toISOString`).
-  - El texto de "Hay cambios" se comparte entre todas las tarjetas.
   - Los separadores del kanban quedan mal colocados con 4 columnas.
   - Hay `console.log` dentro del render del calendario.
+  - (Arreglado el 2026-09-29: "Solicitar cambios" desde el modal de detalle, el texto de "Hay cambios" compartido entre tarjetas, que ahora está en `comentariosCambios[tareaId]`, y el calendario móvil desplazado un día.)
+- Fechas en el calendario: para comparar días usa `toFechaKey(fecha)` de `lib/utils.ts`, nunca `toISOString().split('T')[0]`, que pasa a UTC y resta un día en España.
 - `EmailService` es un singleton de módulo: un cambio de SMTP no se aplica hasta que se reinicia la instancia (salvo `reinitialize()`). `getClickUpService()` sí lee la key en cada llamada.
 
 ## Convenciones

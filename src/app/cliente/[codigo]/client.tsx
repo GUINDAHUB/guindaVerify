@@ -15,7 +15,7 @@ import { CheckCircle, MessageCircle, User, RefreshCw, ExternalLink, FileText, Ca
 import { ComentariosModal } from '@/components/comentarios-modal';
 import { PublicacionDetailModal } from '@/components/publicacion-detail-modal';
 import { WikiModal } from '@/components/wiki-modal';
-import { parseClickUpDate, formatClickUpDateToISO } from '@/lib/utils';
+import { parseClickUpDate, formatClickUpDateToISO, toFechaKey } from '@/lib/utils';
 
 interface ClienteData {
   id: string;
@@ -92,7 +92,8 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [comentario, setComentario] = useState('');
+  // Texto de "Hay cambios" por tarea: cada tarjeta tiene el suyo
+  const [comentariosCambios, setComentariosCambios] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [filtros, setFiltros] = useState<Filtros>({
@@ -191,7 +192,9 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     }
   };
 
-  const handleAccion = async (tareaId: string, accion: 'aprobar' | 'hay_cambios') => {
+  // El comentario se pasa como argumento (no se lee del estado) para que siempre
+  // se envíe el texto que el usuario acaba de escribir.
+  const handleAccion = async (tareaId: string, accion: 'aprobar' | 'hay_cambios', comentario = '') => {
     try {
       setActionLoading(tareaId);
 
@@ -216,8 +219,11 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
       // Recargar publicaciones
       await fetchPublicaciones(true);
 
-      // Limpiar estado
-      setComentario('');
+      // Limpiar el texto de esta tarea
+      setComentariosCambios(prev => {
+        const { [tareaId]: _, ...resto } = prev;
+        return resto;
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
@@ -627,7 +633,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
   const obtenerPublicacionesPorFecha = (fecha: Date): TareaPublicacion[] => {
     const todasPublicaciones = obtenerTodasPublicaciones();
-    const fechaStr = fecha.toISOString().split('T')[0];
+    const fechaStr = toFechaKey(fecha);
     
     const resultado = todasPublicaciones.filter(pub => {
       if (!pub.fechaProgramada) return false;
@@ -714,7 +720,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
   const handleDragOver = (e: React.DragEvent, fecha: Date) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    const fechaStr = fecha.toISOString().split('T')[0];
+    const fechaStr = toFechaKey(fecha);
     setDragOverDay(fechaStr);
   };
 
@@ -735,7 +741,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     
     if (!draggedPublication) return;
     
-    const nuevaFecha = fecha.toISOString().split('T')[0];
+    const nuevaFecha = toFechaKey(fecha);
     const fechaActual = formatClickUpDateToISO(draggedPublication.fechaProgramada);
     
     // Si es la misma fecha, no hacer nada
@@ -1201,15 +1207,15 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                     </DialogHeader>
                     <Textarea
                       placeholder="Describe los cambios que necesita esta publicación..."
-                      value={comentario}
-                      onChange={(e) => setComentario(e.target.value)}
+                      value={comentariosCambios[publicacion.id] || ''}
+                      onChange={(e) => setComentariosCambios(prev => ({ ...prev, [publicacion.id]: e.target.value }))}
                       rows={4}
                       className="resize-none"
                     />
                     <DialogFooter>
                       <Button
-                        onClick={() => handleAccion(publicacion.id, 'hay_cambios')}
-                        disabled={actionLoading === publicacion.id || !comentario.trim()}
+                        onClick={() => handleAccion(publicacion.id, 'hay_cambios', comentariosCambios[publicacion.id] || '')}
+                        disabled={actionLoading === publicacion.id || !(comentariosCambios[publicacion.id] || '').trim()}
                         className="w-full bg-orange-600 hover:bg-orange-700"
                       >
                         <MessageCircle className="w-4 h-4 mr-2" />
@@ -1715,7 +1721,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                   const publicacionesDelDia = obtenerPublicacionesPorFecha(diaInfo.fecha);
                   const esHoy = diaInfo.fecha.toDateString() === new Date().toDateString();
                   const esFinDeSemana = index % 7 >= 5; // Sábado (5) y Domingo (6)
-                  const fechaStr = diaInfo.fecha.toISOString().split('T')[0];
+                  const fechaStr = toFechaKey(diaInfo.fecha);
                   const isDragOver = dragOverDay === fechaStr;
                   const dragDropEnabled = data?.cliente.dragDropEnabled ?? true;
                   
@@ -2224,10 +2230,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
           publicacion={selectedPublicacion}
           comentarios={getComentarios(selectedPublicacion.id)}
           onAprobar={() => handleAccion(selectedPublicacion.id, 'aprobar')}
-          onSolicitarCambios={(comentario) => {
-            setComentario(comentario);
-            handleAccion(selectedPublicacion.id, 'hay_cambios');
-          }}
+          onSolicitarCambios={(comentario) => handleAccion(selectedPublicacion.id, 'hay_cambios', comentario)}
           actionLoading={actionLoading === selectedPublicacion.id}
           canEdit={data?.publicacionesPorRevisar?.some(p => p.id === selectedPublicacion.id) || false}
           fetchComentarios={fetchComentarios}

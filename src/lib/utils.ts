@@ -6,6 +6,18 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Devuelve 'YYYY-MM-DD' con el día LOCAL de la fecha (el que ve el usuario en el calendario).
+ * No usar toISOString() para esto: pasa a UTC y en España una fecha a medianoche
+ * se convierte en el día anterior.
+ */
+export function toFechaKey(fecha: Date): string {
+  const año = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  const dia = String(fecha.getDate()).padStart(2, '0');
+  return `${año}-${mes}-${dia}`;
+}
+
+/**
  * Convierte una fecha de ClickUp (que puede ser un timestamp como string) a un objeto Date válido
  */
 export function parseClickUpDate(dateString?: string): Date | null {

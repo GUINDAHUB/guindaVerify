@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getClickUpService } from '@/lib/clickup';
+import { getClickUpService, taskBelongsToList } from '@/lib/clickup';
 import { getSupabaseService } from '@/lib/supabase';
-import { getCurrentClientUser } from '@/lib/auth';
+import { getClientUserForCodigo } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -29,10 +29,19 @@ export async function GET(
     }
 
     // Obtener información del usuario del cliente actual
-    const currentUser = await getCurrentClientUser();
+    const currentUser = await getClientUserForCodigo(codigo);
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Usuario no autenticado' }, { status: 401 });
+    }
 
     // Obtener comentarios de ClickUp
     const clickUpService = await getClickUpService();
+
+    // La tarea tiene que ser de la lista de ClickUp de este cliente
+    const tarea = await clickUpService.getTask(tareaId);
+    if (!taskBelongsToList(tarea, cliente.clickupListId)) {
+      return NextResponse.json({ error: 'Tarea no encontrada' }, { status: 404 });
+    }
     const comentariosClickUp = await clickUpService.getComments(tareaId);
     
     // Obtener comentarios de nuestra base de datos

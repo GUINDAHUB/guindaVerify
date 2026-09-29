@@ -92,38 +92,11 @@ export function AdminPageClient() {
       
       console.log('🔄 Iniciando carga de listas de ClickUp...');
       
-      // Obtener configuración de ClickUp
-      const configResponse = await fetch('/api/admin/configuracion');
-      console.log('📋 Respuesta de configuración:', configResponse.status);
-      
-      if (!configResponse.ok) {
-        const errorText = await configResponse.text();
-        console.error('❌ Error al obtener configuración:', errorText);
-        toast.error('Error al obtener configuración de ClickUp');
-        return;
-      }
-      
-      const configData = await configResponse.json();
-      console.log('⚙️ Configuración obtenida:', {
-        hasApiKey: !!configData.config?.clickupApiKey,
-        hasWorkspaceId: !!configData.config?.clickupWorkspaceId
-      });
-      
-      const { clickupApiKey, clickupWorkspaceId } = configData.config;
-      
-      if (!clickupApiKey || !clickupWorkspaceId) {
-        toast.error('ClickUp no está configurado. Ve a Configuración primero.');
-        return;
-      }
-
-      console.log('🚀 Enviando petición a get-lists...');
+      // La API key y el workspace los pone el servidor desde la configuración guardada
       const response = await fetch('/api/admin/get-lists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey: clickupApiKey,
-          workspaceId: clickupWorkspaceId
-        })
+        body: JSON.stringify({})
       });
 
       console.log('📨 Respuesta de get-lists:', response.status);
@@ -149,28 +122,11 @@ export function AdminPageClient() {
     try {
       setLoadingStatuses(true);
       
-      // Obtener configuración de ClickUp
-      const configResponse = await fetch('/api/admin/configuracion');
-      if (!configResponse.ok) {
-        toast.error('Error al obtener configuración de ClickUp');
-        return;
-      }
-      
-      const configData = await configResponse.json();
-      const { clickupApiKey } = configData.config;
-      
-      if (!clickupApiKey) {
-        toast.error('ClickUp no está configurado. Ve a Configuración primero.');
-        return;
-      }
-
+      // La API key la pone el servidor desde la configuración guardada
       const response = await fetch('/api/admin/get-list-statuses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey: clickupApiKey,
-          listId: listId
-        })
+        body: JSON.stringify({ listId })
       });
 
       const data = await response.json();

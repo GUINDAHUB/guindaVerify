@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth';
 import { getClickUpService } from '@/lib/clickup';
 
 export async function POST(request: NextRequest) {
   try {
-    const { apiKey, listId } = await request.json();
+    const noAuth = await requireAdmin();
+    if (noAuth) return noAuth;
 
-    if (!apiKey || !listId) {
+    const { listId } = await request.json();
+
+    if (!listId) {
       return NextResponse.json(
-        { error: 'API Key y List ID son requeridos' },
+        { error: 'List ID es requerido' },
         { status: 400 }
       );
     }
 
-    const clickUpService = await getClickUpService(apiKey);
+    // Usa la API key guardada en la configuración
+    const clickUpService = await getClickUpService();
     const statuses = await clickUpService.getListStatuses(listId);
 
     return NextResponse.json({ statuses });

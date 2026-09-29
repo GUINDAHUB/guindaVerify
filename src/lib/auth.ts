@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import { supabase } from './supabase';
 
 // Configuración de cookies
@@ -167,15 +169,55 @@ export async function verifyClientPassword(codigo: string, password: string): Pr
   return result.isValid;
 }
 
-// Gestión de sesiones de administrador
-export async function setAdminSession(): Promise<void> {
+// Sesiones firmadas (JWT HS256 con SESSION_SECRET).
+// El contenido de la cookie no se puede falsificar ni editar sin el secreto.
+const ADMIN_SESSION_DAYS = 7;
+const CLIENT_SESSION_DAYS = 30;
+
+function getSessionSecret(): Uint8Array {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error('SESSION_SECRET no configurado (mínimo 32 caracteres)');
+  }
+  return new TextEncoder().encode(secret);
+}
+
+async function signSession(payload: JWTPayload, days: number): Promise<string> {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(`${days}d`)
+    .sign(getSessionSecret());
+}
+
+async function readSession(cookieName: string): Promise<JWTPayload | null> {
   const cookieStore = await cookies();
-  cookieStore.set(AUTH_COOKIE, 'authenticated', {
+  const token = cookieStore.get(cookieName)?.value;
+  if (!token) return null;
+
+  try {
+    const { payload } = await jwtVerify(token, getSessionSecret(), { algorithms: ['HS256'] });
+    return payload;
+  } catch {
+    // Cookie antigua (sin firmar), caducada o manipulada
+    return null;
+  }
+}
+
+function cookieOptions(days: number) {
+  return {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7, // 7 días
-  });
+    sameSite: 'lax' as const,
+    maxAge: 60 * 60 * 24 * days,
+  };
+}
+
+// Gestión de sesiones de administrador
+export async function setAdminSession(): Promise<void> {
+  const token = await signSession({ role: 'admin' }, ADMIN_SESSION_DAYS);
+  const cookieStore = await cookies();
+  cookieStore.set(AUTH_COOKIE, token, cookieOptions(ADMIN_SESSION_DAYS));
 }
 
 export async function clearAdminSession(): Promise<void> {
@@ -184,40 +226,33 @@ export async function clearAdminSession(): Promise<void> {
 }
 
 export async function isAdminAuthenticated(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get(AUTH_COOKIE);
-  return authCookie?.value === 'authenticated';
+  const session = await readSession(AUTH_COOKIE);
+  return session?.role === 'admin';
 }
 
-// Gestión de sesiones de cliente (nueva versión con usuarios)
+// Para las API routes de admin: devuelve una respuesta 401 si no hay sesión, o null si la hay.
+// Uso: const noAuth = await requireAdmin(); if (noAuth) return noAuth;
+export async function requireAdmin(): Promise<NextResponse | null> {
+  if (await isAdminAuthenticated()) return null;
+  return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+}
+
+// Gestión de sesiones de cliente
+// La cookie guarda el código del cliente y los datos básicos del usuario, firmados.
 export async function setClientUserSession(codigo: string, user: any): Promise<void> {
-  const cookieStore = await cookies();
-  
-  // Mantener compatibilidad con código de cliente
-  cookieStore.set(CLIENT_AUTH_COOKIE, codigo, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 30, // 30 días
-  });
+  const sessionUser = {
+    id: user.id,
+    nombre: user.nombre,
+    username: user.username,
+    es_admin_cliente: user.es_admin_cliente,
+    cliente_id: user.cliente_id,
+  };
+  const token = await signSession({ role: 'client', codigo, user: sessionUser }, CLIENT_SESSION_DAYS);
 
-  // Nueva cookie con información del usuario
-  cookieStore.set(CLIENT_USER_COOKIE, JSON.stringify(user), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 30, // 30 días
-  });
-}
-
-export async function setClientSession(codigo: string): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.set(CLIENT_AUTH_COOKIE, codigo, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 30, // 30 días
-  });
+  cookieStore.set(CLIENT_AUTH_COOKIE, token, cookieOptions(CLIENT_SESSION_DAYS));
+  // Cookie del sistema anterior (JSON sin firmar): ya no se usa
+  cookieStore.delete(CLIENT_USER_COOKIE);
 }
 
 export async function clearClientSession(): Promise<void> {
@@ -226,49 +261,34 @@ export async function clearClientSession(): Promise<void> {
   cookieStore.delete(CLIENT_USER_COOKIE);
 }
 
-export async function getClientSession(): Promise<string | null> {
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get(CLIENT_AUTH_COOKIE);
-  return authCookie?.value || null;
-}
-
-export async function getCurrentClientUser(): Promise<any | null> {
-  try {
-    const cookieStore = await cookies();
-    const userCookie = cookieStore.get(CLIENT_USER_COOKIE);
-    
-    if (!userCookie?.value) {
-      return null;
-    }
-
-    return JSON.parse(userCookie.value);
-  } catch (error) {
-    console.error('Error al obtener usuario cliente:', error);
+async function readClientSession(): Promise<{ codigo: string; user: any } | null> {
+  const session = await readSession(CLIENT_AUTH_COOKIE);
+  if (session?.role !== 'client' || typeof session.codigo !== 'string' || !session.user) {
     return null;
   }
+  return { codigo: session.codigo, user: session.user };
+}
+
+export async function getClientSession(): Promise<string | null> {
+  const session = await readClientSession();
+  return session?.codigo || null;
+}
+
+// Usuario de la sesión, sea del cliente que sea. Para rutas bajo /cliente/[codigo]
+// usar getClientUserForCodigo, que además comprueba que la sesión es de ese cliente.
+export async function getCurrentClientUser(): Promise<any | null> {
+  const session = await readClientSession();
+  return session?.user || null;
+}
+
+export async function getClientUserForCodigo(codigo: string): Promise<any | null> {
+  const session = await readClientSession();
+  if (!session || session.codigo !== codigo) return null;
+  return session.user;
 }
 
 export async function isClientAuthenticated(codigo: string): Promise<boolean> {
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get(CLIENT_AUTH_COOKIE);
-  return authCookie?.value === codigo;
-}
-
-export async function isClientUserAuthenticated(codigo: string): Promise<{ isAuthenticated: boolean; user?: any }> {
-  const cookieStore = await cookies();
-  const authCookie = cookieStore.get(CLIENT_AUTH_COOKIE);
-  const userCookie = cookieStore.get(CLIENT_USER_COOKIE);
-  
-  if (authCookie?.value !== codigo) {
-    return { isAuthenticated: false };
-  }
-
-  try {
-    const user = userCookie?.value ? JSON.parse(userCookie.value) : null;
-    return { isAuthenticated: true, user };
-  } catch (error) {
-    return { isAuthenticated: false };
-  }
+  return (await getClientUserForCodigo(codigo)) !== null;
 }
 
 // Utilidades para actualizar contraseñas
@@ -395,7 +415,6 @@ export async function createClientUser(
       .single();
 
     console.log('Supabase response - error:', error);
-    console.log('Supabase response - data:', data);
 
     if (error) {
       console.error('Error al crear usuario cliente:', error);

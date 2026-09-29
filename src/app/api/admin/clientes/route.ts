@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth';
 import { getSupabaseService } from '@/lib/supabase';
 
 export async function GET() {
   try {
+    const noAuth = await requireAdmin();
+    if (noAuth) return noAuth;
+
     const supabaseService = getSupabaseService();
     const clientes = await supabaseService.getAllClientes();
 
@@ -21,6 +25,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const noAuth = await requireAdmin();
+    if (noAuth) return noAuth;
+
     const body = await request.json();
     const {
       codigo,

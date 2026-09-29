@@ -924,30 +924,36 @@ export class ClickUpService {
   }
 }
 
-// Instancia singleton del servicio
-let clickUpService: ClickUpService | null = null;
+// Instancias cacheadas por API key: si la key cambia en la configuración, la siguiente
+// llamada crea un servicio nuevo en vez de seguir usando la antigua.
+const clickUpServices = new Map<string, ClickUpService>();
 
 export async function getClickUpService(apiKey?: string): Promise<ClickUpService> {
-  if (!clickUpService) {
-    let key = apiKey;
-    
-    if (!key) {
-      // Obtener la API Key desde Supabase
-      const supabaseService = getSupabaseService();
-      const config = await supabaseService.getConfiguracionSistema();
-      
-      if (!config?.clickupApiKey) {
-        throw new Error('ClickUp API Key no configurada en la base de datos');
-      }
-      
-      key = config.clickupApiKey;
-    }
-    
-    if (!key) {
-      throw new Error('ClickUp API Key no disponible');
-    }
-    
-    clickUpService = new ClickUpService(key);
+  let key = apiKey;
+
+  if (!key) {
+    // Obtener la API Key desde Supabase
+    const supabaseService = getSupabaseService();
+    const config = await supabaseService.getConfiguracionSistema();
+    key = config?.clickupApiKey;
   }
-  return clickUpService;
-} 
+
+  if (!key) {
+    throw new Error('ClickUp API Key no configurada en la base de datos');
+  }
+
+  let service = clickUpServices.get(key);
+  if (!service) {
+    clickUpServices.clear();
+    service = new ClickUpService(key);
+    clickUpServices.set(key, service);
+  }
+  return service;
+}
+
+// Comprueba que una tarea pertenece a la lista de ClickUp de un cliente
+// (lista principal o lista adicional si la tarea está en varias).
+export function taskBelongsToList(task: ClickUpTask & { locations?: Array<{ id: string }> }, listId: string): boolean {
+  if (task.list?.id === listId) return true;
+  return (task.locations || []).some(location => location.id === listId);
+}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getClickUpService } from '@/lib/clickup';
 import { getSupabaseService } from '@/lib/supabase';
 import { getNotificationService } from '@/lib/notifications';
+import { getClientUserForCodigo } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -13,6 +14,11 @@ export async function GET(
     const forceRefresh = searchParams.get('forceRefresh') === 'true';
 
     console.log(`📡 API Publicaciones - Cliente: ${codigo}, ForceRefresh: ${forceRefresh}`);
+
+    // Solo usuarios con sesión de este cliente
+    if (!(await getClientUserForCodigo(codigo))) {
+      return NextResponse.json({ error: 'Usuario no autenticado' }, { status: 401 });
+    }
 
     // Obtener información del cliente
     const supabaseService = getSupabaseService();

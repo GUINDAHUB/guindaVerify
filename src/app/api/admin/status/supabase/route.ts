@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth';
 import { getSupabaseService } from '@/lib/supabase';
 
 export async function GET() {
   try {
+    const noAuth = await requireAdmin();
+    if (noAuth) return noAuth;
+
     const supabaseService = getSupabaseService();
     
     // Intentar obtener la configuración del sistema como prueba de conexión

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth';
 import { getSupabaseService } from '@/lib/supabase';
 
 export async function PUT(
@@ -6,6 +7,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const noAuth = await requireAdmin();
+    if (noAuth) return noAuth;
+
     const { id } = await params;
     const body = await request.json();
     const {
@@ -94,6 +98,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const noAuth = await requireAdmin();
+    if (noAuth) return noAuth;
+
     const { id } = await params;
     const supabaseService = getSupabaseService();
 

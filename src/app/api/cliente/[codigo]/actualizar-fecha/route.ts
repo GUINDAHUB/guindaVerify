@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseService } from '@/lib/supabase';
-import { getClickUpService } from '@/lib/clickup';
-import { getCurrentClientUser, logActivity } from '@/lib/auth';
+import { getClickUpService, taskBelongsToList } from '@/lib/clickup';
+import { getClientUserForCodigo, logActivity } from '@/lib/auth';
 
 export async function PUT(
   request: NextRequest,
@@ -32,7 +32,7 @@ export async function PUT(
     }
 
     // Obtener información del usuario actual
-    const currentUser = await getCurrentClientUser();
+    const currentUser = await getClientUserForCodigo(codigo);
     
     if (!currentUser) {
       return NextResponse.json({ error: 'Usuario no autenticado' }, { status: 401 });
@@ -53,6 +53,12 @@ export async function PUT(
     // Actualizar la fecha en ClickUp usando el servicio
     // Verificar si necesitamos usar la API key específica del cliente
     const clickUpService = await getClickUpService();
+
+    // La tarea tiene que ser de la lista de ClickUp de este cliente
+    const tarea = await clickUpService.getTask(tareaId);
+    if (!taskBelongsToList(tarea, cliente.clickupListId)) {
+      return NextResponse.json({ error: 'Tarea no encontrada' }, { status: 404 });
+    }
     
     try {
       // Actualizar la fecha de vencimiento de la tarea

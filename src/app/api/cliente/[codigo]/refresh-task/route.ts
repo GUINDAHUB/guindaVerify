@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getClickUpService } from '@/lib/clickup';
+import { getClickUpService, taskBelongsToList } from '@/lib/clickup';
 import { getSupabaseService } from '@/lib/supabase';
-import { getCurrentClientUser, logActivity } from '@/lib/auth';
+import { getClientUserForCodigo, logActivity } from '@/lib/auth';
 
 export async function POST(
   request: NextRequest,
@@ -31,7 +31,7 @@ export async function POST(
     }
 
     // Obtener información del usuario actual
-    const currentUser = await getCurrentClientUser();
+    const currentUser = await getClientUserForCodigo(codigo);
     
     if (!currentUser) {
       return NextResponse.json({ error: 'Usuario no autenticado' }, { status: 401 });
@@ -40,6 +40,11 @@ export async function POST(
     // Obtener la tarea fresca desde ClickUp con refresh forzado
     const clickUpService = await getClickUpService();
     const tareaFresca = await clickUpService.getTask(tareaId, true);
+
+    // La tarea tiene que ser de la lista de ClickUp de este cliente
+    if (!taskBelongsToList(tareaFresca, cliente.clickupListId)) {
+      return NextResponse.json({ error: 'Tarea no encontrada' }, { status: 404 });
+    }
 
     // Convertir a formato de publicación
     const publicacionActualizada = clickUpService.convertToTareaPublicacion(tareaFresca);

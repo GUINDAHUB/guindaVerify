@@ -1,10 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import { Cliente, Comentario, AccionTarea } from '@/types';
 
+// Este módulo solo se usa en el servidor (API routes y server components).
+// Usa la clave secreta de Supabase, que ignora RLS: la BD está cerrada al rol anon
+// y todo el acceso pasa por aquí. NUNCA importar desde un componente "use client".
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
 export class SupabaseService {
   // Clientes
@@ -329,39 +334,39 @@ export class SupabaseService {
       updatedAt: new Date().toISOString()
     };
 
-    // Intentar crear la configuración por defecto
-    try {
-      await this.updateConfiguracionSistema(defaultConfig);
-    } catch (error) {
-      console.error('Error creando configuración por defecto:', error);
-    }
-
+    // No se escribe en la BD: si la lectura falló por un error puntual,
+    // guardar estos valores vacíos borraría la configuración real (API key, SMTP).
     return defaultConfig;
   }
 
   async updateConfiguracionSistema(config: any): Promise<boolean> {
     try {
-      // Convertir camelCase a snake_case para la base de datos
-      const dbConfig = {
+      // Convertir camelCase a snake_case para la base de datos.
+      // Solo se escriben los campos que vienen en `config`: un campo ausente (undefined)
+      // conserva su valor actual en vez de quedar a null.
+      const campos: Record<string, string> = {
+        clickupApiKey: 'clickup_api_key',
+        clickupWorkspaceId: 'clickup_workspace_id',
+        estadosPorDefecto: 'estados_por_defecto',
+        smtpHost: 'smtp_host',
+        smtpPort: 'smtp_port',
+        smtpSecure: 'smtp_secure',
+        smtpUser: 'smtp_user',
+        smtpPass: 'smtp_pass',
+        smtpFromName: 'smtp_from_name',
+        smtpFromEmail: 'smtp_from_email',
+        smtpEnabled: 'smtp_enabled',
+      };
+
+      const dbConfig: Record<string, any> = {
         id: config.id || '00000000-0000-0000-0000-000000000000',
-        clickup_api_key: config.clickupApiKey || null,
-        clickup_workspace_id: config.clickupWorkspaceId || null,
-        estados_por_defecto: config.estadosPorDefecto || {
-          pendiente_revision: 'Pendiente de Revisión',
-          aprobado: 'Aprobado',
-          rechazado: 'Rechazado'
-        },
-        // Configuración SMTP
-        smtp_host: config.smtpHost || null,
-        smtp_port: config.smtpPort || null,
-        smtp_secure: config.smtpSecure || null,
-        smtp_user: config.smtpUser || null,
-        smtp_pass: config.smtpPass || null,
-        smtp_from_name: config.smtpFromName || null,
-        smtp_from_email: config.smtpFromEmail || null,
-        smtp_enabled: config.smtpEnabled || null,
         updated_at: new Date().toISOString()
       };
+      for (const [campo, columna] of Object.entries(campos)) {
+        if (config[campo] !== undefined) {
+          dbConfig[columna] = config[campo] === '' ? null : config[campo];
+        }
+      }
 
       const { error } = await supabase
         .from('configuracion_sistema')

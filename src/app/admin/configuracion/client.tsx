@@ -33,6 +33,12 @@ export function ConfiguracionPageClient() {
     smtpEnabled: false
   });
 
+  // Los secretos no se descargan: solo sabemos si hay uno guardado
+  const [secretosGuardados, setSecretosGuardados] = useState({
+    clickupApiKey: false,
+    smtpPass: false
+  });
+
   const [status, setStatus] = useState({
     supabase: false,
     clickup: false,
@@ -53,6 +59,10 @@ export function ConfiguracionPageClient() {
       if (response.ok) {
         const data = await response.json();
         const loadedConfig = data.config || {};
+        setSecretosGuardados({
+          clickupApiKey: !!loadedConfig.clickupApiKeySet,
+          smtpPass: !!loadedConfig.smtpPassSet
+        });
         
         // Asegurar que todos los campos tengan valores definidos
         setConfig({
@@ -114,6 +124,7 @@ export function ConfiguracionPageClient() {
 
       if (response.ok) {
         toast.success('Configuración guardada exitosamente');
+        await loadConfig(); // Vacía los campos secretos y marca los guardados
         await checkStatus(); // Re-verificar estado después de guardar
       } else {
         const error = await response.json();
@@ -350,11 +361,13 @@ export function ConfiguracionPageClient() {
                   type="password"
                   value={config.clickupApiKey}
                   onChange={(e) => setConfig({...config, clickupApiKey: e.target.value})}
-                  placeholder="pk_1234567890_ABCDEFGHIJKLMNOP"
-                  required
+                  placeholder={secretosGuardados.clickupApiKey ? '•••••••• (guardada)' : 'pk_1234567890_ABCDEFGHIJKLMNOP'}
+                  required={!secretosGuardados.clickupApiKey}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Encuentra tu API Key en ClickUp → Settings → Apps → API Token
+                  {secretosGuardados.clickupApiKey
+                    ? 'Hay una API Key guardada. Déjalo vacío para mantenerla o escribe una nueva para cambiarla.'
+                    : 'Encuentra tu API Key en ClickUp → Settings → Apps → API Token'}
                 </p>
               </div>
 
@@ -560,11 +573,13 @@ export function ConfiguracionPageClient() {
                         type="password"
                         value={config.smtpPass}
                         onChange={(e) => setConfig({...config, smtpPass: e.target.value})}
-                        placeholder="••••••••••••••••"
-                        required={config.smtpEnabled}
+                        placeholder={secretosGuardados.smtpPass ? '•••••••• (guardada)' : '••••••••••••••••'}
+                        required={config.smtpEnabled && !secretosGuardados.smtpPass}
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Para Gmail: usa una contraseña de aplicación
+                        {secretosGuardados.smtpPass
+                          ? 'Hay una contraseña guardada. Déjalo vacío para mantenerla.'
+                          : 'Para Gmail: usa una contraseña de aplicación'}
                       </p>
                     </div>
                   </div>

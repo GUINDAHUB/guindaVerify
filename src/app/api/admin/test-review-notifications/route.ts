@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth';
 import { getSupabaseService } from '@/lib/supabase';
 import { getClickUpService } from '@/lib/clickup';
 import { getNotificationService } from '@/lib/notifications';
 
 export async function POST(request: NextRequest) {
   try {
+    const noAuth = await requireAdmin();
+    if (noAuth) return noAuth;
+
     console.log('🧪 === INICIANDO PRUEBA DE NOTIFICACIONES DE REVISIÓN ===');
     
     const supabaseService = getSupabaseService();

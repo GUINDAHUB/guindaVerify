@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth';
 import { getSupabaseService } from '@/lib/supabase';
 import { getClickUpService } from '@/lib/clickup';
 
 export async function GET() {
   try {
+    const noAuth = await requireAdmin();
+    if (noAuth) return noAuth;
+
     // Obtener configuración de ClickUp desde Supabase
     const supabaseService = getSupabaseService();
     const config = await supabaseService.getConfiguracionSistema();

@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth';
 import { getClickUpService } from '@/lib/clickup';
+import { getSupabaseService } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
-    const { apiKey, workspaceId } = await request.json();
+    const noAuth = await requireAdmin();
+    if (noAuth) return noAuth;
 
-    if (!apiKey || !workspaceId) {
+    // La API key y el workspace se leen de la configuración guardada (no viajan al navegador)
+    const config = await getSupabaseService().getConfiguracionSistema();
+    const workspaceId = config?.clickupWorkspaceId;
+
+    if (!config?.clickupApiKey || !workspaceId) {
       return NextResponse.json(
-        { error: 'API Key y Workspace ID son requeridos' },
+        { error: 'ClickUp no está configurado. Ve a Configuración primero.' },
         { status: 400 }
       );
     }
 
-    const clickUpService = await getClickUpService(apiKey);
+    const clickUpService = await getClickUpService();
     const lists = await clickUpService.getLists(workspaceId);
 
     return NextResponse.json({ lists });

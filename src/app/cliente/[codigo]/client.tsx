@@ -58,6 +58,13 @@ interface ClientePortalClientProps {
 
 // Helper function para manejar respuestas de API de forma segura
 const handleApiResponse = async (response: Response, defaultErrorMessage: string) => {
+  // Sesión caducada o inválida: volver a la pantalla de login (se recarga la página
+  // y el server component redirige a /cliente/[codigo]/login)
+  if (response.status === 401) {
+    window.location.reload();
+    throw new Error('Tu sesión ha caducado. Vuelve a iniciar sesión.');
+  }
+
   if (!response.ok) {
     let errorMessage = defaultErrorMessage;
     try {

@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
       clickupStatusNotStarted,
       estadosAprobacion,
       estadosRechazo,
+      estadoCambiosCopy,
       dragDropEnabled,
       notifyNewPublications,
       notifyNewComments
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
       clickupStatusNotStarted: clickupStatusNotStarted || null,
       estadosAprobacion: estadosAprobacion || [],
       estadosRechazo: estadosRechazo || [],
+      estadoCambiosCopy: estadoCambiosCopy || null,
       activo: true,
       dragDropEnabled: dragDropEnabled ?? true,
       notifyNewPublications: notifyNewPublications ?? false,

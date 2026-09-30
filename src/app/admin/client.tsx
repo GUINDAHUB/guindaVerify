@@ -13,6 +13,15 @@ import { Plus, Edit, Trash2, Users, Settings, Eye, RefreshCw, UserPlus, Move, Ma
 import { toast } from "sonner";
 import { Cliente } from '@/types';
 import AdminLayout from '@/components/admin-layout';
+import {
+  EstadosMappingTable,
+  EstadosMapping,
+  sugerirMapping,
+  mappingDesdeConfig,
+  configDesdeMapping,
+  estadosConVariasFunciones,
+  validarMapping,
+} from '@/components/estados-mapping';
 
 export function AdminPageClient() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -25,10 +34,6 @@ export function AdminPageClient() {
     email: '',
     logoUrl: '',
     clickupListId: '',
-    estadosVisibles: '',
-    clickupStatusNotStarted: '',
-    estadosAprobacion: '',
-    estadosRechazo: '',
     dragDropEnabled: true,
     notifyNewPublications: false,
     notifyNewComments: false
@@ -40,9 +45,9 @@ export function AdminPageClient() {
   const [loadingLists, setLoadingLists] = useState(false);
   const [loadingStatuses, setLoadingStatuses] = useState(false);
   const [selectedList, setSelectedList] = useState<string>('');
-  const [selectedEstadosVisibles, setSelectedEstadosVisibles] = useState<string[]>([]);
-  const [selectedEstadosAprobacion, setSelectedEstadosAprobacion] = useState<string[]>([]);
-  const [selectedEstadosRechazo, setSelectedEstadosRechazo] = useState<string[]>([]);
+  // Qué es cada estado de ClickUp en el Verify (ver components/estados-mapping.tsx)
+  const [estadosMapping, setEstadosMapping] = useState<EstadosMapping>({});
+  const [avisosEstados, setAvisosEstados] = useState<string[]>([]);
 
   
   // Estados para gestión de usuarios
@@ -118,7 +123,8 @@ export function AdminPageClient() {
     }
   };
 
-  const loadClickUpStatuses = async (listId: string) => {
+  // aplicarSugerencias: rellena el mapeo según el nombre de cada estado (cliente nuevo o lista nueva)
+  const loadClickUpStatuses = async (listId: string, aplicarSugerencias = false) => {
     try {
       setLoadingStatuses(true);
       
@@ -133,6 +139,9 @@ export function AdminPageClient() {
       
       if (response.ok) {
         setClickupStatuses(data.statuses || []);
+        if (aplicarSugerencias) {
+          setEstadosMapping(sugerirMapping(data.statuses || []));
+        }
         toast.success(`${data.statuses?.length || 0} estados cargados`);
       } else {
         toast.error(data.error || 'Error al cargar estados de la lista');
@@ -146,6 +155,13 @@ export function AdminPageClient() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const errorEstados = validarMapping(estadosMapping);
+    if (errorEstados) {
+      toast.error(errorEstados);
+      return;
+    }
+    const configEstados = configDesdeMapping(estadosMapping, clickupStatuses.map(s => s.status));
     
     try {
       const url = editingCliente 
@@ -160,13 +176,7 @@ export function AdminPageClient() {
         body: JSON.stringify({
           ...formData,
           clickupListId: selectedList || formData.clickupListId,
-          estadosVisibles: selectedEstadosVisibles.length > 0 ? selectedEstadosVisibles : 
-            (formData.estadosVisibles ? formData.estadosVisibles.split(',').map(s => s.trim()) : []),
-          clickupStatusNotStarted: formData.clickupStatusNotStarted,
-          estadosAprobacion: selectedEstadosAprobacion.length > 0 ? selectedEstadosAprobacion : 
-            (formData.estadosAprobacion ? formData.estadosAprobacion.split(',').map(s => s.trim()) : []),
-          estadosRechazo: selectedEstadosRechazo.length > 0 ? selectedEstadosRechazo : 
-            (formData.estadosRechazo ? formData.estadosRechazo.split(',').map(s => s.trim()) : []),
+          ...configEstados,
         }),
       });
 
@@ -211,10 +221,6 @@ export function AdminPageClient() {
       email: cliente.email || '',
       logoUrl: cliente.logoUrl || '',
       clickupListId: cliente.clickupListId,
-      estadosVisibles: cliente.estadosVisibles.join(', '),
-      clickupStatusNotStarted: cliente.clickupStatusNotStarted || '',
-      estadosAprobacion: cliente.estadosAprobacion.join(', '),
-      estadosRechazo: cliente.estadosRechazo.join(', '),
       dragDropEnabled: cliente.dragDropEnabled ?? true,
       notifyNewPublications: cliente.notifyNewPublications ?? false,
       notifyNewComments: cliente.notifyNewComments ?? false,
@@ -222,9 +228,16 @@ export function AdminPageClient() {
     
     // Configurar los estados seleccionados para el modo edición
     setSelectedList(cliente.clickupListId);
-    setSelectedEstadosVisibles(cliente.estadosVisibles);
-    setSelectedEstadosAprobacion(cliente.estadosAprobacion);
-    setSelectedEstadosRechazo(cliente.estadosRechazo);
+    const configGuardada = {
+      clickupStatusNotStarted: cliente.clickupStatusNotStarted || null,
+      estadosVisibles: cliente.estadosVisibles,
+      estadosRechazo: cliente.estadosRechazo,
+      estadosAprobacion: cliente.estadosAprobacion,
+      estadoCambiosCopy: cliente.estadoCambiosCopy || null,
+    };
+    // Cliente existente: se respeta lo guardado (las sugerencias solo se muestran, no se aplican)
+    setEstadosMapping(mappingDesdeConfig(configGuardada));
+    setAvisosEstados(estadosConVariasFunciones(configGuardada));
     
     // Cargar los estados de la lista si tenemos el ID
     if (cliente.clickupListId) {
@@ -242,10 +255,6 @@ export function AdminPageClient() {
       email: '',
       logoUrl: '',
       clickupListId: '',
-      estadosVisibles: '',
-      clickupStatusNotStarted: '',
-      estadosAprobacion: '',
-      estadosRechazo: '',
       dragDropEnabled: true,
       notifyNewPublications: false,
       notifyNewComments: false
@@ -253,9 +262,8 @@ export function AdminPageClient() {
     
     // Limpiar los nuevos estados
     setSelectedList('');
-    setSelectedEstadosVisibles([]);
-    setSelectedEstadosAprobacion([]);
-    setSelectedEstadosRechazo([]);
+    setEstadosMapping({});
+    setAvisosEstados([]);
     setClickupLists([]);
     setClickupStatuses([]);
   };
@@ -268,40 +276,16 @@ export function AdminPageClient() {
     setSelectedList(listId);
     setFormData({...formData, clickupListId: listId});
     
-    // Limpiar estados previos
-    setSelectedEstadosVisibles([]);
-    setSelectedEstadosAprobacion([]);
-    setSelectedEstadosRechazo([]);
+    // Lista nueva: se vacía el mapeo y se rellena con sugerencias al cargar sus estados
+    setEstadosMapping({});
+    setAvisosEstados([]);
     setClickupStatuses([]);
     
-    // Cargar estados de la nueva lista
     if (listId) {
-      loadClickUpStatuses(listId);
+      loadClickUpStatuses(listId, true);
     }
   };
 
-  const handleStatusSelect = (status: string, type: 'visible' | 'aprobacion' | 'rechazo') => {
-    switch (type) {
-      case 'visible':
-        const newVisibles = selectedEstadosVisibles.includes(status)
-          ? selectedEstadosVisibles.filter(s => s !== status)
-          : [...selectedEstadosVisibles, status];
-        setSelectedEstadosVisibles(newVisibles);
-        break;
-      case 'aprobacion':
-        const newAprobacion = selectedEstadosAprobacion.includes(status)
-          ? selectedEstadosAprobacion.filter(s => s !== status)
-          : [...selectedEstadosAprobacion, status];
-        setSelectedEstadosAprobacion(newAprobacion);
-        break;
-      case 'rechazo':
-        const newRechazo = selectedEstadosRechazo.includes(status)
-          ? selectedEstadosRechazo.filter(s => s !== status)
-          : [...selectedEstadosRechazo, status];
-        setSelectedEstadosRechazo(newRechazo);
-        break;
-    }
-  };
 
 
 
@@ -651,149 +635,20 @@ export function AdminPageClient() {
                   </div>
 
                   <div>
-                    <Label htmlFor="clickupStatusNotStarted">Estado "Sin Empezar" (ClickUp)</Label>
-                    <Select 
-                      onValueChange={(val) => setFormData({...formData, clickupStatusNotStarted: val})} 
-                      value={formData.clickupStatusNotStarted}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona el estado inicial..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clickupStatuses.length > 0 ? (
-                          clickupStatuses.map((status) => (
-                            <SelectItem key={status.id} value={status.status}>
-                              {status.status}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-status" disabled>
-                            {selectedList ? 'No hay estados disponibles' : 'Selecciona una lista primero'}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Estado previo a "Por Revisar". Aparecerá en el calendario y opcionalmente en Kanban.
+                    <Label>Estados de ClickUp *</Label>
+                    <p className="text-xs text-gray-500 mt-1 mb-2">
+                      Indica qué es cada estado de la lista en el Verify. Si hay varios estados con la misma
+                      función, el primero es al que se mueve la tarea al aprobar o pedir cambios.
+                      &quot;Cambios de copy&quot; es opcional: si no se asigna, el cliente pide los cambios como siempre.
                     </p>
-                  </div>
-
-                  <div>
-                    <Label>Estados Visibles *</Label>
-                    <div className="border rounded-md p-3 min-h-[80px] bg-gray-50">
-                      {loadingStatuses ? (
-                        <div className="flex items-center justify-center py-4">
-                          <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                          <span className="text-sm text-gray-500">Cargando estados...</span>
-                        </div>
-                      ) : clickupStatuses.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {clickupStatuses.map((status) => (
-                            <Button
-                              key={status.id}
-                              type="button"
-                              variant={selectedEstadosVisibles.includes(status.status) ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => handleStatusSelect(status.status, 'visible')}
-                              className="text-xs"
-                            >
-                              {status.status}
-                            </Button>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-500 py-4">
-                          {selectedList ? 'No se encontraron estados' : 'Selecciona una lista primero'}
-                        </p>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Estados que aparecerán en el portal del cliente
-                    </p>
-                    {selectedEstadosVisibles.length > 0 && (
-                      <p className="text-xs text-blue-600 mt-1">
-                        Seleccionados: {selectedEstadosVisibles.join(', ')}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Estados Aprobación *</Label>
-                      <div className="border rounded-md p-3 min-h-[80px] bg-gray-50">
-                        {loadingStatuses ? (
-                          <div className="flex items-center justify-center py-4">
-                            <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                            <span className="text-xs text-gray-500">Cargando...</span>
-                          </div>
-                        ) : clickupStatuses.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {clickupStatuses.map((status) => (
-                              <Button
-                                key={status.id}
-                                type="button"
-                                variant={selectedEstadosAprobacion.includes(status.status) ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => handleStatusSelect(status.status, 'aprobacion')}
-                                className="text-xs"
-                              >
-                                {status.status}
-                              </Button>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-gray-500 py-4">
-                            {selectedList ? 'No hay estados' : 'Selecciona lista'}
-                          </p>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Al aprobar
-                      </p>
-                      {selectedEstadosAprobacion.length > 0 && (
-                        <p className="text-xs text-green-600 mt-1">
-                          {selectedEstadosAprobacion.join(', ')}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <Label>Estados Rechazo *</Label>
-                      <div className="border rounded-md p-3 min-h-[80px] bg-gray-50">
-                        {loadingStatuses ? (
-                          <div className="flex items-center justify-center py-4">
-                            <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                            <span className="text-xs text-gray-500">Cargando...</span>
-                          </div>
-                        ) : clickupStatuses.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {clickupStatuses.map((status) => (
-                              <Button
-                                key={status.id}
-                                type="button"
-                                variant={selectedEstadosRechazo.includes(status.status) ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => handleStatusSelect(status.status, 'rechazo')}
-                                className="text-xs"
-                              >
-                                {status.status}
-                              </Button>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-gray-500 py-4">
-                            {selectedList ? 'No hay estados' : 'Selecciona lista'}
-                          </p>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Al rechazar
-                      </p>
-                      {selectedEstadosRechazo.length > 0 && (
-                        <p className="text-xs text-red-600 mt-1">
-                          {selectedEstadosRechazo.join(', ')}
-                        </p>
-                      )}
-                    </div>
+                    <EstadosMappingTable
+                      statuses={clickupStatuses}
+                      mapping={estadosMapping}
+                      onChange={setEstadosMapping}
+                      loading={loadingStatuses}
+                      hayLista={!!(selectedList || formData.clickupListId)}
+                      avisos={avisosEstados}
+                    />
                   </div>
 
                   {/* Configuraciones adicionales */}

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Cliente, Comentario, AccionTarea } from '@/types';
+import { Cliente, Comentario, AccionTarea, TipoCambio } from '@/types';
 
 // Este módulo solo se usa en el servidor (API routes y server components).
 // Usa la clave secreta de Supabase, que ignora RLS: la BD está cerrada al rol anon
@@ -86,6 +86,7 @@ export class SupabaseService {
         clickup_status_not_started: cliente.clickupStatusNotStarted,
         estados_aprobacion: cliente.estadosAprobacion,
         estados_rechazo: cliente.estadosRechazo,
+        estado_cambios_copy: cliente.estadoCambiosCopy || null,
         activo: cliente.activo,
         drag_drop_enabled: cliente.dragDropEnabled ?? true,
         notify_new_publications: cliente.notifyNewPublications ?? false,
@@ -121,9 +122,10 @@ export class SupabaseService {
       if (updates.logoUrl !== undefined) updatesDB.logo_url = updates.logoUrl;
       if (updates.clickupListId) updatesDB.clickup_list_id = updates.clickupListId;
       if (updates.estadosVisibles) updatesDB.estados_visibles = updates.estadosVisibles;
-      if (updates.clickupStatusNotStarted) updatesDB.clickup_status_not_started = updates.clickupStatusNotStarted;
+      if (updates.clickupStatusNotStarted !== undefined) updatesDB.clickup_status_not_started = updates.clickupStatusNotStarted || null;
       if (updates.estadosAprobacion) updatesDB.estados_aprobacion = updates.estadosAprobacion;
       if (updates.estadosRechazo) updatesDB.estados_rechazo = updates.estadosRechazo;
+      if (updates.estadoCambiosCopy !== undefined) updatesDB.estado_cambios_copy = updates.estadoCambiosCopy || null;
       if (updates.activo !== undefined) updatesDB.activo = updates.activo;
       if (updates.dragDropEnabled !== undefined) updatesDB.drag_drop_enabled = updates.dragDropEnabled;
       if (updates.notifyNewPublications !== undefined) updatesDB.notify_new_publications = updates.notifyNewPublications;
@@ -182,6 +184,7 @@ export class SupabaseService {
       clickupStatusNotStarted: data.clickup_status_not_started,
       estadosAprobacion: data.estados_aprobacion || [],
       estadosRechazo: data.estados_rechazo || [],
+      estadoCambiosCopy: data.estado_cambios_copy || null,
       activo: data.activo,
       dragDropEnabled: data.drag_drop_enabled ?? true,
       notifyNewPublications: data.notify_new_publications ?? false,
@@ -237,7 +240,14 @@ export class SupabaseService {
     try {
       const { data, error } = await supabase
         .from('acciones_tareas')
-        .insert([{ ...accion, fechaAccion: new Date().toISOString() }])
+        .insert([{
+          tarea_id: accion.tareaId,
+          cliente_id: accion.clienteId,
+          usuario_id: accion.usuarioId || null,
+          accion: accion.accion,
+          tipo_cambio: accion.tipoCambio || null,
+          comentario: accion.comentario || null,
+        }])
         .select()
         .single();
 
@@ -250,6 +260,35 @@ export class SupabaseService {
     } catch (error) {
       console.error('Error en createAccionTarea:', error);
       return null;
+    }
+  }
+
+  // Último tipo de cambio pedido para cada tarea (tareaId -> tipo)
+  async getUltimosTiposCambio(clienteId: string, tareaIds: string[]): Promise<Record<string, TipoCambio>> {
+    if (tareaIds.length === 0) return {};
+    try {
+      const { data, error } = await supabase
+        .from('acciones_tareas')
+        .select('tarea_id, tipo_cambio, fecha_accion')
+        .eq('cliente_id', clienteId)
+        .eq('accion', 'hay_cambios')
+        .in('tarea_id', tareaIds)
+        .not('tipo_cambio', 'is', null)
+        .order('fecha_accion', { ascending: false });
+
+      if (error) {
+        console.error('Error obteniendo tipos de cambio:', error);
+        return {};
+      }
+
+      const tipos: Record<string, TipoCambio> = {};
+      for (const fila of data || []) {
+        if (!tipos[fila.tarea_id]) tipos[fila.tarea_id] = fila.tipo_cambio;
+      }
+      return tipos;
+    } catch (error) {
+      console.error('Error en getUltimosTiposCambio:', error);
+      return {};
     }
   }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getClickUpService, taskBelongsToList } from '@/lib/clickup';
 import { getSupabaseService } from '@/lib/supabase';
 import { getClientUserForCodigo, logActivity } from '@/lib/auth';
+import type { TipoCambio } from '@/types';
 
 export async function POST(
   request: NextRequest,
@@ -10,7 +11,13 @@ export async function POST(
   try {
     const { codigo } = await params;
     const body = await request.json();
-    const { tareaId, accion, comentario } = body;
+    const { tareaId, accion } = body;
+    // tipoCambio solo se usa si el cliente tiene estado de "cambios de copy" configurado.
+    // Con 'ambos' el texto llega separado en comentarioCopy y comentarioVisual.
+    const tipoCambioBody: string | undefined = body.tipoCambio;
+    const comentarioCopy: string = (body.comentarioCopy || '').trim();
+    const comentarioVisual: string = (body.comentarioVisual || '').trim();
+    let comentario: string = (body.comentario || '').trim();
 
     // Validar datos requeridos
     if (!tareaId || !accion) {
@@ -66,22 +73,62 @@ export async function POST(
     // Determinar el nuevo estado según la acción
     let nuevoEstado: string;
     let mensajeComentario: string;
+    let tipoCambio: TipoCambio | undefined;
 
     switch (accion) {
       case 'aprobar':
         nuevoEstado = cliente.estadosAprobacion[0] || 'Aprobado';
         mensajeComentario = `✅ [${currentUser.nombre}]: Aprobado`;
         break;
-      case 'hay_cambios':
-        if (!comentario) {
+      case 'hay_cambios': {
+        // Los comentarios del cliente en ClickUp deben empezar por "[Nombre]: " (con o sin emoji
+        // delante): así los reconoce el filtro de privacidad de /comentarios y se muestran siempre.
+        const prefijo = `🔄 [${currentUser.nombre}]:`;
+        const estadoVisual = cliente.estadosRechazo[0] || 'Hay cambios';
+
+        if (!cliente.estadoCambiosCopy) {
+          // Cliente sin distinción copy/visual: funcionamiento de siempre
+          if (!comentario) {
+            return NextResponse.json(
+              { error: 'Comentario es requerido para solicitar cambios' },
+              { status: 400 }
+            );
+          }
+          nuevoEstado = estadoVisual;
+          mensajeComentario = `${prefijo} ${comentario}`;
+          break;
+        }
+
+        if (tipoCambioBody === 'ambos') {
+          if (!comentarioCopy || !comentarioVisual) {
+            return NextResponse.json(
+              { error: 'Explica tanto los cambios de copy como los visuales' },
+              { status: 400 }
+            );
+          }
+          tipoCambio = 'ambos';
+          // Una tarea solo puede tener un estado: con los dos tipos va a cambios visuales
+          nuevoEstado = estadoVisual;
+          comentario = `Copy: ${comentarioCopy}\nVisual: ${comentarioVisual}`;
+          mensajeComentario = `${prefijo} (Copy + visual)\n✍️ Copy: ${comentarioCopy}\n🎨 Visual: ${comentarioVisual}`;
+        } else if (tipoCambioBody === 'copy' || tipoCambioBody === 'visual') {
+          if (!comentario) {
+            return NextResponse.json(
+              { error: 'Comentario es requerido para solicitar cambios' },
+              { status: 400 }
+            );
+          }
+          tipoCambio = tipoCambioBody;
+          nuevoEstado = tipoCambio === 'copy' ? cliente.estadoCambiosCopy : estadoVisual;
+          mensajeComentario = `${prefijo} (${tipoCambio === 'copy' ? 'Cambio de copy' : 'Cambio visual'}) ${comentario}`;
+        } else {
           return NextResponse.json(
-            { error: 'Comentario es requerido para solicitar cambios' },
+            { error: 'Indica si los cambios son de copy, visuales o ambos' },
             { status: 400 }
           );
         }
-        nuevoEstado = cliente.estadosRechazo[0] || 'Hay cambios';
-        mensajeComentario = `🔄 [${currentUser.nombre}]: ${comentario}`;
         break;
+      }
       default:
         return NextResponse.json(
           { error: 'Acción no válida' },
@@ -103,23 +150,12 @@ export async function POST(
       clienteId: cliente.id,
       usuarioId: currentUser.id,
       accion,
+      tipoCambio,
       comentario: comentario || mensajeComentario,
     });
 
-    // Si hay cambios solicitados, también guardarlo en la tabla de comentarios
-    let comentarioCreado = null;
-    if (accion === 'hay_cambios' && comentario) {
-      comentarioCreado = await supabaseService.createComentario({
-        tareaId,
-        clienteId: cliente.id,
-        usuarioId: currentUser.id,
-        contenido: `[${currentUser.nombre}]: ${comentario}`,
-        autor: {
-          nombre: currentUser.nombre,
-          email: currentUser.email || '',
-        },
-      });
-    }
+    // El comentario del cliente se guarda solo en ClickUp (de ahí lo lee el portal).
+    // No se duplica en la tabla `comentarios`: saldría repetido en el modal.
 
     // Registrar la actividad en el log
     const ipAddress = request.ip || request.headers.get('x-forwarded-for')?.split(',')[0] || null;
@@ -129,9 +165,9 @@ export async function POST(
       currentUser.id,
       cliente.id,
       accion,
-      `Acción ${accion} en tarea ${tareaId}${comentario ? ': ' + comentario : ''}`,
+      `Acción ${accion}${tipoCambio ? ` (${tipoCambio})` : ''} en tarea ${tareaId}${comentario ? ': ' + comentario : ''}`,
       tareaId,
-      comentarioCreado?.id,
+      undefined,
       accionCreada?.id,
       ipAddress,
       userAgent

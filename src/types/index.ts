@@ -10,7 +10,8 @@ export interface Cliente {
   estadosVisibles: string[]; // Estados que aparecen en el portal
   clickupStatusNotStarted?: string; // Estado para publicaciones sin empezar
   estadosAprobacion: string[]; // Estados cuando aprueba
-  estadosRechazo: string[]; // Estados cuando rechaza
+  estadosRechazo: string[]; // Estados de "cambios visuales" (el primero es el destino al pedir cambios)
+  estadoCambiosCopy?: string | null; // Estado de "cambios de copy". Vacío = sin distinción copy/visual
   activo: boolean;
   dragDropEnabled?: boolean; // Permite arrastrar publicaciones en el calendario
   notifyNewPublications?: boolean; // Notificaciones de nuevas publicaciones en revision
@@ -150,7 +151,11 @@ export interface TareaPublicacion {
   // Nuevos campos
   descripcionPublicacion?: string;  // Copy para el pie de publicación en redes
   urlStories?: string;  // URL para las stories
+  // Tipo de cambio pedido (solo en "Pendientes de cambios" y si el cliente tiene estado de copy)
+  tipoCambio?: TipoCambio;
 }
+
+export type TipoCambio = 'copy' | 'visual' | 'ambos';
 
 export interface UsuarioCliente {
   id: string;
@@ -182,6 +187,7 @@ export interface AccionTarea {
   clienteId: string;
   usuarioId?: string; // Nuevo campo para trazabilidad
   accion: 'aprobar' | 'hay_cambios';
+  tipoCambio?: TipoCambio;
   comentario?: string;
   fechaAccion: Date;
 }

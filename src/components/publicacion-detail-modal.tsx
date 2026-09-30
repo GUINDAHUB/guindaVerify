@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { TareaPublicacion, Comentario } from '@/types';
 import { formatClickUpDate } from '@/lib/utils';
+import { SolicitarCambiosForm, SolicitudCambios, TipoCambioBadge } from '@/components/solicitar-cambios-form';
 
 interface PublicacionDetailModalProps {
   isOpen: boolean;
@@ -31,7 +32,8 @@ interface PublicacionDetailModalProps {
   publicacion: TareaPublicacion;
   comentarios: Comentario[];
   onAprobar: () => void;
-  onSolicitarCambios: (comentario: string) => void;
+  onSolicitarCambios: (solicitud: SolicitudCambios) => Promise<boolean>;
+  cambiosCopyEnabled?: boolean;
   actionLoading: boolean;
   canEdit: boolean;
   fetchComentarios?: (tareaId: string) => Promise<any[]>;
@@ -45,12 +47,12 @@ export function PublicacionDetailModal({
   comentarios,
   onAprobar,
   onSolicitarCambios,
+  cambiosCopyEnabled = false,
   actionLoading,
   canEdit,
   fetchComentarios,
   loadingComentarios = false
 }: PublicacionDetailModalProps) {
-  const [comentario, setComentario] = useState('');
   const [hasLoadedComments, setHasLoadedComments] = useState(false);
 
   // Cargar comentarios cuando se abra el modal (solo una vez por publicación)
@@ -66,12 +68,6 @@ export function PublicacionDetailModal({
     }
   }, [isOpen, publicacion.id]);
 
-  const handleSolicitarCambios = () => {
-    if (comentario.trim()) {
-      onSolicitarCambios(comentario.trim());
-      setComentario('');
-    }
-  };
 
 
 
@@ -108,6 +104,7 @@ export function PublicacionDetailModal({
                   <Badge className={`${getEstadoColor(publicacion.estado)} border font-medium`}>
                     {publicacion.estado}
                   </Badge>
+                  <TipoCambioBadge tipo={publicacion.tipoCambio} />
                   {publicacion.fechaProgramada && (
                     <div className="flex items-center text-sm text-gray-600">
                       <Calendar className="w-4 h-4 mr-1" />
@@ -349,24 +346,12 @@ export function PublicacionDetailModal({
                     </Button>
 
                     {/* Solicitar Cambios */}
-                    <div className="space-y-2">
-                      <Textarea
-                        placeholder="Describe los cambios necesarios..."
-                        value={comentario}
-                        onChange={(e) => setComentario(e.target.value)}
-                        rows={3}
-                        className="resize-none"
-                      />
-                      <Button
-                        onClick={handleSolicitarCambios}
-                        disabled={actionLoading || !comentario.trim()}
-                        variant="outline"
-                        className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
-                      >
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Solicitar cambios
-                      </Button>
-                    </div>
+                    <SolicitarCambiosForm
+                      cambiosCopyEnabled={cambiosCopyEnabled}
+                      loading={actionLoading}
+                      onEnviar={onSolicitarCambios}
+                      compacto
+                    />
                   </div>
                 </div>
               )}
@@ -378,6 +363,11 @@ export function PublicacionDetailModal({
                     {publicacion.estado === 'Aprobado' 
                       ? '✅ Publicación aprobada' 
                       : '🔄 Esperando cambios del equipo'}
+                    {publicacion.tipoCambio && (
+                      <div className="mt-2 not-italic">
+                        <TipoCambioBadge tipo={publicacion.tipoCambio} />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

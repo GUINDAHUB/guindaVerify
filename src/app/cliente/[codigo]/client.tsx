@@ -16,6 +16,7 @@ import { ComentariosModal } from '@/components/comentarios-modal';
 import { PublicacionDetailModal } from '@/components/publicacion-detail-modal';
 import { WikiModal } from '@/components/wiki-modal';
 import { parseClickUpDate, formatClickUpDateToISO, toFechaKey } from '@/lib/utils';
+import { SolicitarCambiosForm, SolicitudCambios, TipoCambioBadge } from '@/components/solicitar-cambios-form';
 
 interface ClienteData {
   id: string;
@@ -24,6 +25,7 @@ interface ClienteData {
   logoUrl?: string;
   dragDropEnabled?: boolean;
   clickupStatusNotStarted?: string;
+  cambiosCopyEnabled?: boolean; // El cliente elige entre cambios de copy / visuales / ambos
 }
 
 interface PublicacionesResponse {
@@ -92,8 +94,6 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Texto de "Hay cambios" por tarea: cada tarjeta tiene el suyo
-  const [comentariosCambios, setComentariosCambios] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [filtros, setFiltros] = useState<Filtros>({
@@ -192,19 +192,19 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
     }
   };
 
-  // El comentario se pasa como argumento (no se lee del estado) para que siempre
-  // se envíe el texto que el usuario acaba de escribir.
-  const handleAccion = async (tareaId: string, accion: 'aprobar' | 'hay_cambios', comentario = '') => {
+  // Los datos de "Hay cambios" llegan como argumento desde SolicitarCambiosForm (cada
+  // formulario tiene su propio estado). Devuelve true si la acción se hizo bien.
+  const handleAccion = async (
+    tareaId: string,
+    accion: 'aprobar' | 'hay_cambios',
+    solicitud: SolicitudCambios = {}
+  ): Promise<boolean> => {
     try {
       setActionLoading(tareaId);
 
-      const body: { tareaId: string; accion: string; comentario?: string } = { tareaId, accion };
+      const body: { tareaId: string; accion: string } & SolicitudCambios = { tareaId, accion };
       if (accion === 'hay_cambios') {
-        if (!comentario.trim()) {
-          toast.error('Por favor ingresa un comentario explicando los cambios necesarios');
-          return;
-        }
-        body.comentario = comentario;
+        Object.assign(body, solicitud);
       }
 
       const response = await fetch(`/api/cliente/${codigo}/acciones`, {
@@ -219,13 +219,10 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
       // Recargar publicaciones
       await fetchPublicaciones(true);
 
-      // Limpiar el texto de esta tarea
-      setComentariosCambios(prev => {
-        const { [tareaId]: _, ...resto } = prev;
-        return resto;
-      });
+      return true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error desconocido');
+      return false;
     } finally {
       setActionLoading(null);
     }
@@ -850,6 +847,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                 📅 {new Date(publicacion.fechaProgramada).toLocaleDateString('es-ES')}
               </p>
             )}
+            <TipoCambioBadge tipo={publicacion.tipoCambio} className="mt-1" />
           </div>
           <div className="flex space-x-1 ml-2">
             <button
@@ -954,6 +952,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
         <div className="font-medium text-gray-900 line-clamp-2 text-xs mb-1 group-hover:text-gray-700">
           {publicacion.nombre}
         </div>
+        <TipoCambioBadge tipo={publicacion.tipoCambio} className="mb-1" />
         
         {publicacion.textoPublicacion && (
           <div className="text-gray-600 line-clamp-1 text-xs mb-1">
@@ -1027,6 +1026,7 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
 
           {/* Tipo y Plataformas */}
           <div className="flex flex-wrap gap-2 mb-3">
+            <TipoCambioBadge tipo={publicacion.tipoCambio} className="text-xs px-2.5 py-1" />
             {publicacion.tipoPublicacion && (
               <Badge className={`${getTipoPublicacionColor(publicacion.tipoPublicacion)} text-xs font-medium border`}>
                 {publicacion.tipoPublicacion}
@@ -1205,23 +1205,11 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
                         Explica qué cambios necesita &quot;{publicacion.nombre}&quot;
                       </DialogDescription>
                     </DialogHeader>
-                    <Textarea
-                      placeholder="Describe los cambios que necesita esta publicación..."
-                      value={comentariosCambios[publicacion.id] || ''}
-                      onChange={(e) => setComentariosCambios(prev => ({ ...prev, [publicacion.id]: e.target.value }))}
-                      rows={4}
-                      className="resize-none"
+                    <SolicitarCambiosForm
+                      cambiosCopyEnabled={data?.cliente.cambiosCopyEnabled ?? false}
+                      loading={actionLoading === publicacion.id}
+                      onEnviar={(solicitud) => handleAccion(publicacion.id, 'hay_cambios', solicitud)}
                     />
-                    <DialogFooter>
-                      <Button
-                        onClick={() => handleAccion(publicacion.id, 'hay_cambios', comentariosCambios[publicacion.id] || '')}
-                        disabled={actionLoading === publicacion.id || !(comentariosCambios[publicacion.id] || '').trim()}
-                        className="w-full bg-orange-600 hover:bg-orange-700"
-                      >
-                        <MessageCircle className="w-4 h-4 mr-2" />
-                        Solicitar cambios
-                      </Button>
-                    </DialogFooter>
                   </DialogContent>
                 </Dialog>
               </div>
@@ -2230,7 +2218,8 @@ export function ClientePortalClient({ codigo }: ClientePortalClientProps) {
           publicacion={selectedPublicacion}
           comentarios={getComentarios(selectedPublicacion.id)}
           onAprobar={() => handleAccion(selectedPublicacion.id, 'aprobar')}
-          onSolicitarCambios={(comentario) => handleAccion(selectedPublicacion.id, 'hay_cambios', comentario)}
+          onSolicitarCambios={(solicitud) => handleAccion(selectedPublicacion.id, 'hay_cambios', solicitud)}
+          cambiosCopyEnabled={data?.cliente.cambiosCopyEnabled ?? false}
           actionLoading={actionLoading === selectedPublicacion.id}
           canEdit={data?.publicacionesPorRevisar?.some(p => p.id === selectedPublicacion.id) || false}
           fetchComentarios={fetchComentarios}

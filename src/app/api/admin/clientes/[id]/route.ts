@@ -22,6 +22,7 @@ export async function PUT(
       clickupStatusNotStarted,
       estadosAprobacion,
       estadosRechazo,
+      estadoCambiosCopy,
       dragDropEnabled,
       notifyNewPublications,
       notifyNewComments
@@ -68,6 +69,7 @@ export async function PUT(
       clickupStatusNotStarted: clickupStatusNotStarted || null,
       estadosAprobacion: estadosAprobacion || [],
       estadosRechazo: estadosRechazo || [],
+      estadoCambiosCopy: estadoCambiosCopy || null,
       dragDropEnabled: dragDropEnabled ?? true,
       notifyNewPublications: notifyNewPublications ?? false,
       notifyNewComments: notifyNewComments ?? false,

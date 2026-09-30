@@ -49,6 +49,16 @@ export async function POST(
     // Convertir a formato de publicación
     const publicacionActualizada = clickUpService.convertToTareaPublicacion(tareaFresca);
 
+    // Misma etiqueta copy / visual / ambos que en /publicaciones
+    if (cliente.estadoCambiosCopy) {
+      if (publicacionActualizada.estado === cliente.estadoCambiosCopy) {
+        publicacionActualizada.tipoCambio = 'copy';
+      } else if (cliente.estadosRechazo.includes(publicacionActualizada.estado)) {
+        const tipos = await supabaseService.getUltimosTiposCambio(cliente.id, [tareaId]);
+        publicacionActualizada.tipoCambio = tipos[tareaId] === 'ambos' ? 'ambos' : 'visual';
+      }
+    }
+
     // Registrar la actividad en el log
     const ipAddress = request.ip || request.headers.get('x-forwarded-for')?.split(',')[0] || null;
     const userAgent = request.headers.get('user-agent') || null;

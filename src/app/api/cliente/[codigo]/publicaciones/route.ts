@@ -75,11 +75,33 @@ export async function GET(
       )
     );
 
+    // "Pendientes de cambios" junta los cambios visuales (estadosRechazo) y, si el cliente
+    // lo tiene configurado, los de copy (estadoCambiosCopy)
+    const estadoCopy = cliente.estadoCambiosCopy || null;
     const publicacionesPendientesCambios = ordenarPorFecha(
       (todasLasPublicaciones || []).filter(pub => 
-        pub && cliente.estadosRechazo && cliente.estadosRechazo.includes(pub.estado)
+        pub && (
+          (cliente.estadosRechazo && cliente.estadosRechazo.includes(pub.estado)) ||
+          (estadoCopy !== null && pub.estado === estadoCopy)
+        )
       )
     );
+
+    // Etiqueta copy / visual / copy + visual. El estado dice si es copy o visual;
+    // "ambos" se distingue de "visual" por la última petición guardada en acciones_tareas.
+    if (estadoCopy) {
+      const tiposGuardados = await supabaseService.getUltimosTiposCambio(
+        cliente.id,
+        publicacionesPendientesCambios.map((pub: any) => pub.id)
+      );
+      for (const pub of publicacionesPendientesCambios) {
+        if (pub.estado === estadoCopy) {
+          pub.tipoCambio = 'copy';
+        } else {
+          pub.tipoCambio = tiposGuardados[pub.id] === 'ambos' ? 'ambos' : 'visual';
+        }
+      }
+    }
 
     const publicacionesAprobadas = ordenarPorFecha(
       (todasLasPublicaciones || []).filter(pub => 
@@ -113,6 +135,7 @@ export async function GET(
         clickupListId: cliente.clickupListId,
         clickupStatusNotStarted: cliente.clickupStatusNotStarted,
         dragDropEnabled: cliente.dragDropEnabled ?? true,
+        cambiosCopyEnabled: !!cliente.estadoCambiosCopy,
       },
       publicacionesSinEmpezar: publicacionesSinEmpezar || [],
       publicacionesPorRevisar: publicacionesPorRevisar || [],

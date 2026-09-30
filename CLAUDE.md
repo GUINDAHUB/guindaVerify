@@ -71,9 +71,17 @@ No hay `middleware.ts`/`proxy.ts`. La protección de las páginas se hace en cad
 2. `publicaciones/route.ts` reparte las tareas en columnas según la config del cliente:
    - `clickup_status_not_started` → "Sin empezar" (opcional)
    - `estados_visibles` → **"Por revisar"** (la única columna en la que se puede actuar)
-   - `estados_rechazo` → "Pendientes de cambios"
+   - `estados_rechazo` (cambios visuales) + `estado_cambios_copy` (si está configurado) → "Pendientes de cambios"
    - `estados_aprobacion` → "Aprobadas"
-3. **Aprobar** → mueve la tarea a `estados_aprobacion[0]` y comenta `✅ [Nombre]: Aprobado`. **Hay cambios** → `estados_rechazo[0]` y comenta `🔄 [Nombre]: texto`. Las dos acciones se guardan también en `acciones_tareas` y `logs_actividad`.
+3. **Aprobar** → mueve la tarea a `estados_aprobacion[0]` y comenta `✅ [Nombre]: Aprobado`.
+   **Hay cambios** tiene dos modos según el cliente:
+   - **Sin `estado_cambios_copy`**: funciona como siempre. Pasa a `estados_rechazo[0]` y comenta `🔄 [Nombre]: texto`.
+   - **Con `estado_cambios_copy`**: el cliente elige entre copy, visual o ambos (`components/solicitar-cambios-form.tsx`).
+     - `copy` → pasa a `estado_cambios_copy`.
+     - `visual` → pasa a `estados_rechazo[0]`.
+     - `ambos` → pasa a `estados_rechazo[0]`, con los dos textos separados en un solo comentario (`🔄 [Nombre]: (Copy + visual)\n✍️ Copy: …\n🎨 Visual: …`).
+     - El tipo se guarda en `acciones_tareas.tipo_cambio`. `/publicaciones` lo devuelve como `tipoCambio` y las tarjetas lo muestran con `TipoCambioBadge`. "Ambos" solo se distingue de "visual" por esa tabla.
+   - Las acciones se registran también en `logs_actividad`. **Los comentarios del cliente deben empezar por `[Nombre]: `** (con emoji delante o sin él): así los reconoce el filtro de privacidad.
 4. **Arrastrar una tarjeta en el calendario** (`drag_drop_enabled`) actualiza el custom field "Fecha de publicacion" de ClickUp. Si la tarea no lo tiene, actualiza `due_date`.
 5. **Privacidad de comentarios** (`comentarios/[tareaId]/route.ts`):
    - Los comentarios con el patrón `[Nombre]: ` se consideran del cliente y siempre se muestran.
@@ -98,7 +106,8 @@ No hay `middleware.ts`/`proxy.ts`. La protección de las páginas se hace en cad
 | `snapshots_publicaciones` | 15 | Último conjunto de `tarea_ids` en revisión por cliente |
 | `configuracion_sistema` | 1 | Fila singleton `id = 0000…0000`: API key de ClickUp, workspace, SMTP |
 | `auth_admin` | 1 | Hash de la contraseña única del admin |
-| `comentarios`, `acciones_tareas` | 0 | Tienen 0 filas: los inserts de `SupabaseService` usan claves camelCase y seguramente fallan sin que se note. Lo que sí queda registrado está en `logs_actividad` y en ClickUp |
+| `acciones_tareas` | — | Aprobaciones y peticiones de cambios, con `tipo_cambio` (copy/visual/ambos). Hasta el 2026-09-30 no guardaba nada (inserts en camelCase + CHECK que rechazaba `hay_cambios`) |
+| `comentarios` | 0 | **No se usa a propósito.** Si se escribiera en ella, cada comentario del cliente saldría duplicado en el modal (`/comentarios` combina ClickUp + esta tabla) |
 
 Consulta de solo lectura rápida (la anon key ya no tiene acceso; usa la clave secreta de `.env.local`):
 ```bash
@@ -126,6 +135,11 @@ La Supabase CLI tiene acceso a la cuenta (`supabase projects list`). **No escrib
   - calendario móvil L1810-2040
   - kanban L2044-2199
   - modales L2204-2235
+- **Configuración de estados del cliente** (`components/estados-mapping.tsx`): es una tabla con cada estado de la lista de ClickUp y su función en el Verify (Oculto / Sin empezar / Por revisar / Cambios visuales / Cambios de copy / Aprobado). Se traduce a las columnas de `clientes` con `configDesdeMapping`, respetando el orden de ClickUp.
+  - En clientes nuevos o al cambiar de lista, se autocompleta por nombre (`sugerirRol`).
+  - En clientes existentes se respeta lo guardado; las sugerencias solo aparecen como enlace.
+  - Estados internos de producción ("falta contenido", "falta copy") = Oculto.
+  - La función copy/visual está activada solo en `plantilla` (2026-09-30); en el resto se activa desde el admin.
 - `multi-user-login-form.tsx` no se usa en ningún sitio. El enlace "Debug ClickUp" del admin lleva a una página que no existe (404).
 
 ## Seguridad (endurecida el 2026-09-29)
